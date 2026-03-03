@@ -2,6 +2,9 @@ import { CollectionCard } from '@/components/collections/CollectionCard';
 import { CreateCollectionButton } from '@/components/collections/CreateCollectionButton';
 import { prisma } from '@/lib/db/client';
 
+// Force dynamic rendering - no static generation
+export const dynamic = 'force-dynamic';
+
 export default async function CollectionsPage() {
   // TODO: Add authentication
   const collections = await prisma.collection.findMany({

@@ -1,6 +1,9 @@
 import { EntityCard } from '@/components/entities/EntityCard';
 import { prisma } from '@/lib/db/client';
 
+// Force dynamic rendering - no static generation
+export const dynamic = 'force-dynamic';
+
 export default async function EntitiesPage() {
   // TODO: Add authentication
   const entities = await prisma.entity.findMany({

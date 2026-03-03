@@ -3,9 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: 'standalone',
   
-  experimental: {
-    serverComponentsExternalPackages: ['@xenova/transformers'],
-  },
+  // Note: @xenova/transformers is bundled, not external
+  // Turbopack handles dynamic imports natively
   
   images: {
     remotePatterns: [

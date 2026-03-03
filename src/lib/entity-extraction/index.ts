@@ -34,7 +34,7 @@ const patterns = {
     /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+Project)\b/g,
     // Apps/tools
     /\b([A-Z][a-z]+(?:App|Tool|Service|Platform|System))\b/g,
-    # hashtags
+    // hashtags
     /#(\w+)/g,
   ],
   concept: [
@@ -151,7 +151,7 @@ function calculateConfidence(name: string, type: EntityType, context: string): n
 export async function linkEntities(
   entities: ExtractedEntity[],
   existingEntities: Array<{ id: string; name: string; entityType: string; aliases: string[] }>
-): Array<ExtractedEntity & { existingId?: string }> {
+): Promise<Array<ExtractedEntity & { existingId?: string }>> {
   return entities.map(entity => {
     // Try exact match
     const exactMatch = existingEntities.find(

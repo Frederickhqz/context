@@ -5,6 +5,9 @@ import { prisma } from '@/lib/db/client';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 
+// Force dynamic rendering - no static generation
+export const dynamic = 'force-dynamic';
+
 export default async function VisualizePage() {
   // TODO: Add authentication
 

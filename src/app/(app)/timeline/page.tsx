@@ -2,6 +2,9 @@ import { Timeline } from '@/components/timeline/Timeline';
 import { prisma } from '@/lib/db/client';
 import { format, subDays } from 'date-fns';
 
+// Force dynamic rendering - no static generation
+export const dynamic = 'force-dynamic';
+
 export default async function TimelinePage() {
   // Get last 30 days by default
   const end = new Date();

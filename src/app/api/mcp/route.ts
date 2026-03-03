@@ -452,7 +452,7 @@ async function handleAddNote(args: Record<string, unknown>) {
       content,
       contentPlain: content.replace(/[#*_`]/g, ''), // Strip markdown
       noteType: type,
-      embedding: embedding ? JSON.stringify(embedding) : null,
+      // embedding is set separately via vector query
     },
   });
 
@@ -460,21 +460,23 @@ async function handleAddNote(args: Record<string, unknown>) {
   if (entities.length > 0) {
     for (const entityName of entities) {
       // Find or create entity
-      const entity = await prisma.entity.upsert({
+      let entity = await prisma.entity.findFirst({
         where: {
-          userId_name_entityType: {
-            userId: "demo-user",
-            name: entityName,
-            entityType: "concept",
-          }
-        },
-        create: {
           userId: "demo-user",
           name: entityName,
           entityType: "concept",
         },
-        update: {},
       });
+
+      if (!entity) {
+        entity = await prisma.entity.create({
+          data: {
+            userId: "demo-user",
+            name: entityName,
+            entityType: "concept",
+          },
+        });
+      }
 
       // Create mention
       await prisma.entityMention.create({
@@ -498,7 +500,7 @@ async function handleAddNote(args: Record<string, unknown>) {
       });
 
       if (collection) {
-        await prisma.noteCollection.create({
+        await prisma.collectionNote.create({
           data: {
             noteId: note.id,
             collectionId: collection.id,
@@ -830,10 +832,22 @@ async function handleCreateBeat(args: Record<string, unknown>) {
     endedAt?: string;
   };
 
+  if (!noteId) {
+    return NextResponse.json({
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          success: false,
+          error: "noteId is required for creating a beat",
+        }, null, 2)
+      }]
+    });
+  }
+
   const beat = await prisma.beat.create({
     data: {
       userId: "demo-user",
-      noteId: noteId || null,
+      noteId,
       beatType,
       intensity,
       startedAt: startedAt ? new Date(startedAt) : null,

@@ -72,8 +72,7 @@ export async function POST(request: NextRequest) {
       beatType, 
       intensity = 1, 
       startedAt, 
-      endedAt,
-      metadata 
+      endedAt 
     } = body;
 
     // TODO: Add authentication
@@ -93,7 +92,6 @@ export async function POST(request: NextRequest) {
         intensity,
         startedAt: startedAt ? new Date(startedAt) : null,
         endedAt: endedAt ? new Date(endedAt) : null,
-        metadata,
       },
       include: {
         note: { select: { id: true, title: true } },

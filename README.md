@@ -1,57 +1,31 @@
 # Context
 
-> A note-taking app with an agent sublayer and native MCP integration
+> Personal knowledge management with AI-native interfaces
 
-## Overview
-
-Context is a modern note-taking application that enables AI agents to query and understand your notes through the Model Context Protocol (MCP). It combines:
-
-- **Apple Notes simplicity** - Clean, intuitive interface
-- **Obsidian linking** - `[[wiki-link]]` connections between notes
-- **Plane beats** - Time-bound notes for tracking events and feelings
-- **Semantic search** - Find notes by meaning, not just keywords
-- **MCP Server** - Native integration for AI agents to access your notes
+Context is a personal note-taking and knowledge management system designed for AI assistants. It exposes a Model Context Protocol (MCP) server that allows AI agents to retrieve context, create notes, search, and trace connections.
 
 ## Features
 
-### Note Taking
-- **Markdown support** - Write with rich formatting
-- **Note types** - Regular notes, journal entries, and beats
-- **Tags & Collections** - Organize your notes
-- **Entity extraction** - People, places, projects, concepts
-
-### Search & Discovery
-- **Semantic search** - Find notes by meaning using embeddings
-- **Connection tracing** - See how notes relate to each other
-- **Timeline view** - Visualize notes over time
-
-### Agent Integration (MCP)
-- **6 MCP tools** for agent access:
-  - `get_context` - Retrieve relevant context
-  - `add_note` - Create new notes
-  - `search_notes` - Search your notes
-  - `get_timeline` - Get timeline data
-  - `trace_connection` - Explore connections
-  - `get_entities` - Get entities
+- **Semantic Search** - Find notes by meaning using vector embeddings
+- **Entity Extraction** - Automatically extract people, places, projects, concepts, and events
+- **Timeline View** - See notes organized by day/week/month
+- **Connection Tracing** - Follow links between related notes
+- **Beats** - Track events, milestones, feelings, and insights
+- **MCP Server** - AI-native interface for context retrieval
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Framework | Next.js 14 (App Router) |
-| Database | PostgreSQL + pgvector (Supabase) |
-| ORM | Prisma |
-| Auth | Supabase Auth |
-| UI | Tailwind CSS + shadcn/ui |
-| Timeline | React-Chrono + vis-timeline |
-| Embeddings | EmbeddingGemma (local) or OpenAI |
+- **Frontend**: Next.js 14, React, Tailwind CSS
+- **Database**: PostgreSQL with pgvector extension
+- **ORM**: Prisma 7
+- **Embeddings**: Local (Transformers.js) or OpenAI
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL with pgvector extension (or Supabase account)
+- PostgreSQL 15+ with pgvector extension
 - (Optional) OpenAI API key for cloud embeddings
 
 ### Installation
@@ -64,126 +38,164 @@ cd context
 # Install dependencies
 npm install
 
-# Copy environment variables
-cp .env.example .env
-
-# Configure your database
-# Edit .env with your DATABASE_URL and Supabase credentials
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your database URL and API keys
 
 # Run database migrations
-npx prisma migrate dev
+npx prisma db push
 
 # Start development server
 npm run dev
 ```
 
-### Configuration
+### Environment Variables
 
-1. **Database**: Set `DATABASE_URL` for PostgreSQL with pgvector
-2. **Supabase**: Add your `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. **Embeddings**: Choose between local (default) or OpenAI:
-   - Local: `EMBEDDING_PROVIDER=local` (no API key needed)
-   - OpenAI: `EMBEDDING_PROVIDER=openai` + `OPENAI_API_KEY`
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/context"
+EMBEDDING_PROVIDER="local"  # or "openai"
+OPENAI_API_KEY="sk-..."     # if using OpenAI embeddings
+```
+
+## MCP Server
+
+Context exposes an MCP server at `/api/mcp` that provides tools for AI assistants:
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_context` | Retrieve relevant context from notes based on a query |
+| `add_note` | Create a new note with optional entity linking |
+| `search_notes` | Search notes using semantic or keyword search |
+| `get_timeline` | Get notes and beats for a date range |
+| `trace_connection` | Find paths between connected notes |
+| `get_entities` | List entities (people, places, projects, etc.) |
+| `create_beat` | Create a beat (event/milestone/feeling/insight) |
+| `connect_notes` | Create a connection between two notes |
+
+### Example Usage
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "get_context",
+    "arguments": {
+      "query": "project meeting last week",
+      "maxResults": 5
+    }
+  }
+}
+```
+
+## API Endpoints
+
+### Notes
+
+- `GET /api/notes` - List notes
+- `POST /api/notes` - Create note
+- `GET /api/notes/:id` - Get note
+- `PATCH /api/notes/:id` - Update note
+- `DELETE /api/notes/:id` - Delete note
+
+### Search
+
+- `GET /api/search?q=query&type=semantic` - Search notes
+
+### Entities
+
+- `GET /api/entities` - List entities
+- `POST /api/entities` - Create entity
+
+### Connections
+
+- `GET /api/connections` - List connections
+- `POST /api/connections` - Create connection
+
+### Timeline
+
+- `GET /api/timeline?start=date&end=date` - Get timeline
+
+### Beats
+
+- `GET /api/beats` - List beats
+- `POST /api/beats` - Create beat
+
+## Pages
+
+| Path | Description |
+|------|-------------|
+| `/notes` | Note list and creation |
+| `/timeline` | Timeline view of notes |
+| `/visualize` | Calendar, Graph, and Tree views |
+| `/entities` | Entity browser |
+| `/collections` | Collection manager |
+| `/search` | Advanced search interface |
+
+## Database Schema
+
+```prisma
+model Note {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String?
+  content     String   @db.Text
+  contentPlain String? @db.Text
+  noteType    String   @default("note")
+  embedding   String?  @db.Text  // JSON vector
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  entityMentions    EntityMention[]
+  collections       NoteCollection[]
+  outgoingConnections Connection[] @relation("FromNote")
+  incomingConnections Connection[] @relation("ToNote")
+  beats             Beat[]
+}
+
+model Entity {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  entityType  String   // person, place, project, concept, event
+  aliases     String[]
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  
+  mentions    EntityMention[]
+}
+
+model Connection {
+  id             String   @id @default(cuid())
+  userId         String
+  fromNoteId     String
+  toNoteId       String
+  connectionType String   @default("reference")
+  strength       Float    @default(1.0)
+  createdAt      DateTime @default(now())
+  
+  fromNote       Note     @relation("FromNote", fields: [fromNoteId], references: [id])
+  toNote         Note     @relation("ToNote", fields: [toNoteId], references: [id])
+}
+```
 
 ## Development
 
 ```bash
-# Start development server
+# Run development server
 npm run dev
 
-# Run database migrations
-npx prisma migrate dev
-
-# Open Prisma Studio
-npx prisma studio
-
-# Run tests
-npm run test
-```
-
-## Project Structure
-
-```
-context/
-├── src/
-│   ├── app/                    # Next.js App Router
-│   │   ├── (app)/              # Main app routes
-│   │   ├── api/                # API routes
-│   │   │   ├── notes/          # Notes CRUD
-│   │   │   ├── mcp/            # MCP Server
-│   │   │   ├── search/         # Search API
-│   │   │   └── embeddings/     # Embedding generation
-│   │   └── layout.tsx
-│   ├── components/
-│   │   ├── notes/              # Note components
-│   │   ├── timeline/           # Timeline components
-│   │   ├── entities/           # Entity components
-│   │   ├── search/             # Search components
-│   │   └── layout/             # Layout components
-│   ├── lib/
-│   │   ├── db/                 # Database client
-│   │   ├── embeddings/         # Embedding providers
-│   │   └── mcp/                # MCP tools
-│   ├── hooks/                  # React hooks
-│   ├── stores/                 # Zustand stores
-│   └── types/                  # TypeScript types
-├── prisma/
-│   └── schema.prisma           # Database schema
-└── public/
-```
-
-## API Reference
-
-### REST API
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/notes` | GET | List notes |
-| `/api/notes` | POST | Create note |
-| `/api/notes/:id` | GET | Get note |
-| `/api/notes/:id` | PUT | Update note |
-| `/api/notes/:id` | DELETE | Delete note |
-| `/api/search` | GET | Search notes |
-| `/api/entities` | GET | List entities |
-
-### MCP Server
-
-| Tool | Description |
-|------|-------------|
-| `get_context` | Retrieve context from notes |
-| `add_note` | Create new note |
-| `search_notes` | Semantic/keyword search |
-| `get_timeline` | Get timeline data |
-| `trace_connection` | Trace note connections |
-| `get_entities` | Get entities |
-
-## Deployment
-
-### Vercel (Recommended)
-
-1. Push to GitHub
-2. Import to Vercel
-3. Set environment variables
-4. Deploy
-
-### Self-Hosted
-
-```bash
-# Build
+# Build for production
 npm run build
 
-# Start production server
-npm run start
+# Run production server
+npm start
+
+# Run linting
+npm run lint
 ```
-
-## Contributing
-
-Contributions are welcome! Please read our contributing guide.
 
 ## License
 
 MIT
-
----
-
-Built with ❤️ for the AI agent ecosystem

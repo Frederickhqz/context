@@ -1,8 +1,20 @@
-import { EntityCard } from "@/components/entities/EntityCard";
-import { prisma } from "@/lib/db/client";
+import { EntityCard } from '@/components/entities/EntityCard';
+import { prisma } from '@/lib/db/client';
 
 export default async function EntitiesPage() {
-  const entities = await getEntities();
+  // TODO: Add authentication
+  const entities = await prisma.entity.findMany({
+    take: 50,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      _count: {
+        select: { mentions: true },
+      },
+    },
+  });
+
+  // Group by type
+  const grouped = groupByType(entities);
 
   return (
     <div className="space-y-6">
@@ -11,23 +23,31 @@ export default async function EntitiesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Entities</h1>
           <p className="text-muted-foreground">
-            People, places, projects, and concepts in your notes
+            People, places, projects, concepts, and events
           </p>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2">
-        <FilterButton active>All</FilterButton>
-        <FilterButton>👤 People</FilterButton>
-        <FilterButton>📍 Places</FilterButton>
-        <FilterButton>📁 Projects</FilterButton>
-        <FilterButton>💡 Concepts</FilterButton>
-        <FilterButton>📅 Events</FilterButton>
-      </div>
+      {/* Entity groups */}
+      {Object.entries(grouped).map(([type, typeEntities]) => (
+        <div key={type} className="space-y-3">
+          <h2 className="text-lg font-medium capitalize">{type}s</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {typeEntities.map((entity) => (
+              <EntityCard 
+                key={entity.id} 
+                entity={{
+                  ...entity,
+                  mentionCount: entity._count.mentions,
+                }} 
+              />
+            ))}
+          </div>
+        </div>
+      ))}
 
-      {/* Entity grid */}
-      {entities.length === 0 ? (
+      {/* Empty state */}
+      {entities.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="rounded-full bg-muted p-4 mb-4">
             <svg className="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -36,46 +56,28 @@ export default async function EntitiesPage() {
           </div>
           <h3 className="text-lg font-medium">No entities yet</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            Entities are automatically extracted from your notes. Start writing to see them appear here.
+            Entities are automatically extracted from your notes. Start creating notes to see entities appear here.
           </p>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {entities.map((entity) => (
-            <EntityCard key={entity.id} entity={entity} />
-          ))}
         </div>
       )}
     </div>
   );
 }
 
-interface Entity {
-  id: string;
-  name: string;
-  entityType: string;
-  aliases: string[];
-  createdAt: Date;
-}
+function groupByType(entities: any[]) {
+  const grouped: Record<string, any[]> = {
+    person: [],
+    place: [],
+    project: [],
+    concept: [],
+    event: [],
+  };
 
-async function getEntities(): Promise<Entity[]> {
-  // TODO: Add authentication
-  // For now, return empty array
-  return [];
-}
+  for (const entity of entities) {
+    if (grouped[entity.entityType]) {
+      grouped[entity.entityType].push(entity);
+    }
+  }
 
-function FilterButton({ children, active }: { children: React.ReactNode; active?: boolean }) {
-  return (
-    <button
-      className={`
-        px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-        ${active
-          ? "bg-primary text-primary-foreground"
-          : "bg-muted text-muted-foreground hover:bg-muted/80"
-        }
-      `}
-    >
-      {children}
-    </button>
-  );
+  return grouped;
 }

@@ -1,0 +1,161 @@
+// This is your Prisma schema file,
+// learn more about using Prisma with Next.js here: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Notes (core entity)
+model Note {
+  id           String                  @id @default(cuid())
+  userId       String                  @map("user_id")
+  title        String?
+  content      String
+  contentPlain String?                 @map("content_plain")
+  embedding    Unsupported("vector(768)")?
+  noteType     String                  @default("note") @map("note_type")
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
+  metadata     Json?
+
+  // Relations
+  connectionsFrom Connection[]         @relation("ConnectionFrom")
+  connectionsTo   Connection[]         @relation("ConnectionTo")
+  entityMentions  EntityMention[]
+  beats           Beat[]
+  collections     CollectionNote[]
+  tags            NoteTag[]
+
+  @@map("notes")
+}
+
+// Connections (links between notes)
+model Connection {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  fromNoteId     String   @map("from_note_id")
+  toNoteId       String   @map("to_note_id")
+  connectionType String   @default("reference") @map("connection_type")
+  strength       Float    @default(1.0)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  fromNote Note @relation("ConnectionFrom", fields: [fromNoteId], references: [id], onDelete: Cascade)
+  toNote   Note @relation("ConnectionTo", fields: [toNoteId], references: [id], onDelete: Cascade)
+
+  @@unique([fromNoteId, toNoteId, connectionType])
+  @@map("connections")
+}
+
+// Entities (people, places, projects)
+model Entity {
+  id         String        @id @default(cuid())
+  userId     String        @map("user_id")
+  name       String
+  entityType String        @map("entity_type")
+  aliases    String[]
+  metadata   Json?
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  mentions EntityMention[]
+
+  @@map("entities")
+}
+
+// Entity Mentions (junction table)
+model EntityMention {
+  id        String   @id @default(cuid())
+  entityId  String   @map("entity_id")
+  noteId    String   @map("note_id")
+  context   String?
+  confidence Float   @default(1.0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, noteId])
+  @@map("entity_mentions")
+}
+
+// Beats (time-bound notes)
+model Beat {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  noteId    String    @map("note_id")
+  beatType  String    @map("beat_type")
+  startedAt DateTime? @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  intensity Int       @default(3)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@map("beats")
+}
+
+// Collections (grouping notes)
+model Collection {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  color       String   @default("#6366F1")
+  icon        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  notes CollectionNote[]
+
+  @@map("collections")
+}
+
+// Collection Notes (junction)
+model CollectionNote {
+  collectionId String   @map("collection_id")
+  noteId       String   @map("note_id")
+  addedAt      DateTime @default(now()) @map("added_at")
+
+  // Relations
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  note       Note       @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, noteId])
+  @@map("collection_notes")
+}
+
+// Tags
+model Tag {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  name      String
+  color     String   @default("#6B7280")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  notes NoteTag[]
+
+  @@unique([userId, name])
+  @@map("tags")
+}
+
+// Note Tags (junction)
+model NoteTag {
+  noteId String @map("note_id")
+  tagId  String @map("tag_id")
+
+  // Relations
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@map("note_tags")
+}

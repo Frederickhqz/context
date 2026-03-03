@@ -18,6 +18,9 @@ export function Sidebar() {
         <NavItem href="/timeline" icon="calendar">
           Timeline
         </NavItem>
+        <NavItem href="/visualize" icon="diagram">
+          Visualize
+        </NavItem>
         <NavItem href="/entities" icon="users">
           Entities
         </NavItem>
@@ -87,6 +90,11 @@ function Icon({ name }: { name: string }): React.ReactNode {
     "search": (
       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
+    "diagram": (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
       </svg>
     ),
     "settings": (

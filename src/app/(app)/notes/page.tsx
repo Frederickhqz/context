@@ -45,18 +45,13 @@ export default async function NotesPage() {
   );
 }
 
-async function getNotes() {
+async function getNotes(): Promise<Note[]> {
   // TODO: Add authentication
-  // For now, return mock empty array
-  // const user = await getCurrentUser();
-  // if (!user) return [];
-  
-  // Return empty array for now - will connect to real data
+  // For now, return empty array
   return [];
 }
 
-// Mock note type for development
-export interface Note {
+interface Note {
   id: string;
   title: string | null;
   content: string;

@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // Notes (core entity)
@@ -20,7 +19,7 @@ model Note {
   embedding    Unsupported("vector(768)")?
   noteType     String                  @default("note") @map("note_type")
   createdAt    DateTime                @default(now()) @map("created_at")
-  updatedAt    DateTime                @updatedAt @map("updated_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
   metadata     Json?
 
   // Relations

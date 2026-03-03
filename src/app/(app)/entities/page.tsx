@@ -50,7 +50,15 @@ export default async function EntitiesPage() {
   );
 }
 
-async function getEntities() {
+interface Entity {
+  id: string;
+  name: string;
+  entityType: string;
+  aliases: string[];
+  createdAt: Date;
+}
+
+async function getEntities(): Promise<Entity[]> {
   // TODO: Add authentication
   // For now, return empty array
   return [];

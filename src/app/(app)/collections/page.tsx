@@ -1,6 +1,16 @@
 import { cn } from "@/lib/utils/cn";
 import { prisma } from "@/lib/db/client";
 
+interface Collection {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  icon: string | null;
+  createdAt: Date;
+  notes?: { noteId: string }[];
+}
+
 export default async function CollectionsPage() {
   const collections = await getCollections();
 
@@ -42,7 +52,7 @@ export default async function CollectionsPage() {
   );
 }
 
-async function getCollections() {
+async function getCollections(): Promise<Collection[]> {
   // TODO: Add authentication
   // For now, return empty array
   return [];

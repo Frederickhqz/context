@@ -54,7 +54,6 @@ export function Timeline({ items, mode = "VERTICAL", onItemClick }: TimelineProp
           primary: "#6366F1",
           secondary: "#818CF8",
           cardBgColor: "#FFFFFF",
-          cardForeColor: "#1F2937",
           titleColor: "#6366F1",
         }}
       />

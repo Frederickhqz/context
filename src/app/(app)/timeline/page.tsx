@@ -38,7 +38,7 @@ export default async function TimelinePage() {
   );
 }
 
-async function getTimelineItems() {
+async function getTimelineItems(): Promise<any[]> {
   // TODO: Add authentication
   // For now, return empty array
   return [];

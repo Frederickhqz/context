@@ -35,6 +35,15 @@ interface EntityMentionWithEntity {
   };
 }
 
+// Local type for entity with mention count
+interface EntityWithCount {
+  id: string;
+  name: string;
+  entityType: string;
+  aliases: string[];
+  _count: { mentions: number };
+}
+
 interface EntityInfo {
   id: string;
   name: string;
@@ -637,7 +646,7 @@ async function handleSearchNotes(args: Record<string, unknown>) {
       orderBy: { createdAt: 'desc' },
     });
 
-    results = keywordResults.map((n): SemanticResult => ({
+    results = keywordResults.map((n: NoteResult): SemanticResult => ({
       id: n.id,
       title: n.title,
       content_plain: n.contentPlain,
@@ -856,7 +865,7 @@ async function handleGetEntities(args: Record<string, unknown>) {
       },
     });
 
-    entities = results.map((e): EntityInfo => ({
+    entities = results.map((e: EntityWithCount): EntityInfo => ({
       id: e.id,
       name: e.name,
       type: e.entityType,

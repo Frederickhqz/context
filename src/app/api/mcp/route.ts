@@ -12,6 +12,15 @@ interface SemanticResult {
   score: number;
 }
 
+// Local note type for keyword fallback
+interface NoteResult {
+  id: string;
+  title: string | null;
+  contentPlain: string | null;
+  noteType: string;
+  createdAt: Date;
+}
+
 interface EntityInfo {
   id: string;
   name: string;
@@ -395,7 +404,7 @@ async function handleGetContext(args: Record<string, unknown>) {
         type: "text",
         text: JSON.stringify({
           query,
-          results: notes.map(n => ({
+          results: notes.map((n: NoteResult) => ({
             id: n.id,
             title: n.title,
             content: n.contentPlain?.slice(0, 500),

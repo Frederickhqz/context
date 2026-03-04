@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils/cn';
-import type { Prisma } from '@prisma/client';
 
 interface EntityCardProps {
   entity: {
@@ -8,7 +7,7 @@ interface EntityCardProps {
     entityType: string;
     aliases: string[];
     mentionCount: number;
-    metadata?: Prisma.JsonValue | null;
+    metadata?: unknown;
   };
 }
 

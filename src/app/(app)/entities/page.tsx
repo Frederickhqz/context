@@ -1,13 +1,20 @@
 import { EntityCard } from '@/components/entities/EntityCard';
 import { prisma } from '@/lib/db/client';
-import type { Entity } from '@prisma/client';
 
 // Force dynamic rendering - no static generation
 export const dynamic = 'force-dynamic';
 
-type EntityWithCount = Entity & {
+// Local type definition (avoids Prisma client dependency during build)
+interface EntityWithCount {
+  id: string;
+  userId: string;
+  name: string;
+  entityType: string;
+  aliases: string[];
+  metadata: unknown;
+  createdAt: Date;
   _count: { mentions: number };
-};
+}
 
 export default async function EntitiesPage() {
   // TODO: Add authentication

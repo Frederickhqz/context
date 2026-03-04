@@ -1,14 +1,21 @@
 import { CollectionCard } from '@/components/collections/CollectionCard';
 import { CreateCollectionButton } from '@/components/collections/CreateCollectionButton';
 import { prisma } from '@/lib/db/client';
-import type { Collection } from '@prisma/client';
 
 // Force dynamic rendering - no static generation
 export const dynamic = 'force-dynamic';
 
-type CollectionWithCount = Collection & {
+// Local type definition (avoids Prisma client dependency during build)
+interface CollectionWithCount {
+  id: string;
+  userId: string;
+  name: string;
+  description: string | null;
+  color: string;
+  icon: string | null;
+  createdAt: Date;
   _count: { notes: number };
-};
+}
 
 export default async function CollectionsPage() {
   // TODO: Add authentication

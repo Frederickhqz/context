@@ -748,7 +748,7 @@ async function handleGetTimeline(args: Record<string, unknown>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let connections: any[] = [];
   if (includeConnections) {
-    const noteIds = notes.map(n => n.id);
+    const noteIds = notes.map((n: NoteResult) => n.id);
     connections = await prisma.connection.findMany({
       where: {
         OR: [

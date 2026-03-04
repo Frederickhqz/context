@@ -1,0 +1,24 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="apple-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818CF8"/>
+      <stop offset="50%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="180" height="180" rx="40" fill="url(#apple-gradient)"/>
+  
+  <!-- Connection lines -->
+  <path d="M90 36 L90 90 L144 90" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+  <path d="M36 90 L90 90 L90 144" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+  
+  <!-- Nodes -->
+  <circle cx="90" cy="36" r="12" fill="white"/>
+  <circle cx="144" cy="90" r="12" fill="white"/>
+  <circle cx="90" cy="90" r="15" fill="white" opacity="0.5"/>
+  <circle cx="36" cy="90" r="12" fill="white"/>
+  <circle cx="90" cy="144" r="12" fill="white"/>
+  <circle cx="90" cy="90" r="7" fill="white" opacity="0.9"/>
+</svg>

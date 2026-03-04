@@ -8,9 +8,28 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Context - Notes with Agent Sublayer",
-  description: "A note-taking app with semantic search, timeline visualization, and MCP integration for AI agents",
+  title: "Context",
+  description: "Your second brain for notes, ideas, and connections",
   keywords: ["notes", "knowledge management", "semantic search", "timeline", "MCP", "AI"],
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/apple-touch-icon.svg",
+  },
+  openGraph: {
+    title: "Context",
+    description: "Your second brain for notes, ideas, and connections",
+    type: "website",
+    images: ["/og-image.svg"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Context",
+    description: "Your second brain for notes, ideas, and connections",
+    images: ["/og-image.svg"],
+  },
+  manifest: "/manifest.json",
+  themeColor: "#6366F1",
 };
 
 export default function RootLayout({

@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils/cn";
 import { Icon } from "@/components/ui/Icon";
+import { Logo } from "@/components/ui/Logo";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -39,7 +40,7 @@ export function Sidebar() {
         )}
       >
         <div className="flex h-16 items-center border-b px-4">
-          <h1 className="text-xl font-semibold tracking-tight">Context</h1>
+          <Logo size="sm" />
         </div>
 
         <nav className="flex flex-col gap-1 p-4">

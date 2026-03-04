@@ -6,13 +6,13 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen bg-background">
       <Sidebar />
-      <div className="flex-1 ml-64">
-        <div className="container max-w-5xl mx-auto py-8 px-6">
+      <main className="md:ml-64 min-h-screen">
+        <div className="container max-w-5xl mx-auto py-8 px-4 pt-20 md:pt-8">
           {children}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

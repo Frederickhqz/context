@@ -1,9 +1,14 @@
 import { CollectionCard } from '@/components/collections/CollectionCard';
 import { CreateCollectionButton } from '@/components/collections/CreateCollectionButton';
 import { prisma } from '@/lib/db/client';
+import type { Collection } from '@prisma/client';
 
 // Force dynamic rendering - no static generation
 export const dynamic = 'force-dynamic';
+
+type CollectionWithCount = Collection & {
+  _count: { notes: number };
+};
 
 export default async function CollectionsPage() {
   // TODO: Add authentication
@@ -46,13 +51,13 @@ export default async function CollectionsPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {collections.map((collection) => (
-            <CollectionCard 
-              key={collection.id} 
+          {collections.map((collection: CollectionWithCount) => (
+            <CollectionCard
+              key={collection.id}
               collection={{
                 ...collection,
                 noteCount: collection._count.notes,
-              }} 
+              }}
             />
           ))}
         </div>

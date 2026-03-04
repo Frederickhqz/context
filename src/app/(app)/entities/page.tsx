@@ -1,8 +1,13 @@
 import { EntityCard } from '@/components/entities/EntityCard';
 import { prisma } from '@/lib/db/client';
+import type { Entity } from '@prisma/client';
 
 // Force dynamic rendering - no static generation
 export const dynamic = 'force-dynamic';
+
+type EntityWithCount = Entity & {
+  _count: { mentions: number };
+};
 
 export default async function EntitiesPage() {
   // TODO: Add authentication
@@ -36,13 +41,13 @@ export default async function EntitiesPage() {
         <div key={type} className="space-y-3">
           <h2 className="text-lg font-medium capitalize">{type}s</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {typeEntities.map((entity) => (
-              <EntityCard 
-                key={entity.id} 
+            {(typeEntities as EntityWithCount[]).map((entity) => (
+              <EntityCard
+                key={entity.id}
                 entity={{
                   ...entity,
                   mentionCount: entity._count.mentions,
-                }} 
+                }}
               />
             ))}
           </div>
@@ -67,8 +72,8 @@ export default async function EntitiesPage() {
   );
 }
 
-function groupByType(entities: any[]) {
-  const grouped: Record<string, any[]> = {
+function groupByType(entities: EntityWithCount[]) {
+  const grouped: Record<string, EntityWithCount[]> = {
     person: [],
     place: [],
     project: [],

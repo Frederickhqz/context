@@ -8,6 +8,49 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 // Force dynamic rendering - no static generation
 export const dynamic = 'force-dynamic';
 
+// Local type definitions (avoid Prisma client dependency during build)
+interface NoteSelect {
+  id: string;
+  title: string | null;
+  createdAt: Date;
+}
+
+interface BeatSelect {
+  id: string;
+  beatType: string;
+  createdAt: Date;
+  startedAt: Date | null;
+}
+
+interface ConnectionWithNotes {
+  fromNoteId: string;
+  toNoteId: string;
+  connectionType: string;
+  strength: number;
+  fromNote: { id: string; title: string | null };
+  toNote: { id: string; title: string | null };
+}
+
+interface CalendarEvent {
+  id: string;
+  date: Date;
+  type: 'note' | 'beat';
+  title?: string;
+}
+
+interface GraphNode {
+  id: string;
+  label: string;
+  type: 'note';
+}
+
+interface GraphLink {
+  source: string;
+  target: string;
+  type: 'reference' | 'semantic' | 'temporal';
+  strength: number;
+}
+
 export default async function VisualizePage() {
   // TODO: Add authentication
 
@@ -44,14 +87,14 @@ export default async function VisualizePage() {
   });
 
   // Prepare calendar events
-  const calendarEvents = [
-    ...notes.map(n => ({
+  const calendarEvents: CalendarEvent[] = [
+    ...notes.map((n: NoteSelect) => ({
       id: n.id,
       date: n.createdAt,
       type: 'note' as const,
       title: n.title || undefined,
     })),
-    ...beats.map(b => ({
+    ...beats.map((b: BeatSelect) => ({
       id: b.id,
       date: b.startedAt || b.createdAt,
       type: 'beat' as const,
@@ -61,14 +104,14 @@ export default async function VisualizePage() {
 
   // Prepare graph nodes
   const noteIds = new Set<string>();
-  connections.forEach(c => {
+  connections.forEach((c: ConnectionWithNotes) => {
     noteIds.add(c.fromNoteId);
     noteIds.add(c.toNoteId);
   });
 
-  const graphNodes = Array.from(noteIds).map(id => {
-    const note = connections.find(c => c.fromNoteId === id)?.fromNote ||
-                 connections.find(c => c.toNoteId === id)?.toNote;
+  const graphNodes: GraphNode[] = Array.from(noteIds).map((id: string) => {
+    const note = connections.find((c: ConnectionWithNotes) => c.fromNoteId === id)?.fromNote ||
+                 connections.find((c: ConnectionWithNotes) => c.toNoteId === id)?.toNote;
     return {
       id,
       label: note?.title || `Note ${id.slice(0, 4)}`,
@@ -76,7 +119,7 @@ export default async function VisualizePage() {
     };
   });
 
-  const graphLinks = connections.map(c => ({
+  const graphLinks: GraphLink[] = connections.map((c: ConnectionWithNotes) => ({
     source: c.fromNoteId,
     target: c.toNoteId,
     type: c.connectionType as 'reference' | 'semantic' | 'temporal',
@@ -85,7 +128,7 @@ export default async function VisualizePage() {
 
   // Build tree from first connection if available
   const treeData = connections.length > 0
-    ? buildTreeFromConnections(connections[0].fromNoteId, connections)
+    ? buildTreeFromConnections(connections[0].fromNoteId, connections as ConnectionWithNotes[])
     : null;
 
   return (

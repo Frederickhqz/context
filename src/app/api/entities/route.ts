@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { Prisma } from '@prisma/client';
 
 // GET /api/entities - List entities
 export async function GET(request: NextRequest) {
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     // TODO: Add authentication
     // const user = await getCurrentUser();
 
-    const where: any = {};
+    const where: Prisma.EntityWhereInput = {};
     
     if (type) {
       where.entityType = type;
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform to include mention count
-    const result = entities.map(entity => ({
+    const result = entities.map((entity: typeof entities[number]) => ({
       ...entity,
       mentionCount: entity._count.mentions,
     }));

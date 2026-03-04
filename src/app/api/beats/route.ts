@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { Prisma } from '@prisma/client';
 
 // GET /api/beats - List beats
 export async function GET(request: NextRequest) {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     // TODO: Add authentication
 
-    const where: any = {};
+    const where: Prisma.BeatWhereInput = {};
     
     if (type) {
       where.beatType = type;
@@ -25,20 +26,32 @@ export async function GET(request: NextRequest) {
     }
     
     if (startDate || endDate) {
-      where.OR = [
+      const orConditions: Prisma.BeatWhereInput[] = [
         { startedAt: {} },
         { createdAt: {} },
       ];
       
       if (startDate) {
-        where.OR[0].startedAt.gte = new Date(startDate);
-        where.OR[1].createdAt.gte = new Date(startDate);
+        orConditions[0] = { startedAt: { gte: new Date(startDate) } };
+        orConditions[1] = { createdAt: { gte: new Date(startDate) } };
       }
       
       if (endDate) {
-        where.OR[0].startedAt.lte = new Date(endDate);
-        where.OR[1].createdAt.lte = new Date(endDate);
+        orConditions[0] = { 
+          startedAt: { 
+            ...(orConditions[0] as { startedAt: { gte?: Date } }).startedAt,
+            lte: new Date(endDate) 
+          } 
+        };
+        orConditions[1] = { 
+          createdAt: { 
+            ...(orConditions[1] as { createdAt: { gte?: Date } }).createdAt,
+            lte: new Date(endDate) 
+          } 
+        };
       }
+      
+      where.OR = orConditions;
     }
 
     const beats = await prisma.beat.findMany({

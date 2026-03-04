@@ -1,5 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { Prisma } from '@prisma/client';
+
+// Types for timeline data
+type NoteWithRelations = Prisma.NoteGetPayload<{
+  include: {
+    entityMentions: { include: { entity: true } };
+    beats: true;
+    tags: { include: { tag: true } };
+  };
+}>;
+
+type BeatWithNote = Prisma.BeatGetPayload<{
+  include: { note: true };
+}>;
+
+interface TimelineGroup {
+  date: string;
+  notes: Array<{
+    id: string;
+    title: string | null;
+    content: string;
+    type: string;
+    createdAt: Date;
+  }>;
+  beats: Array<{
+    id: string;
+    type: string;
+    intensity: number;
+    startedAt: Date | null;
+    endedAt: Date | null;
+    note: { id: string; title: string | null } | null;
+  }>;
+  entities: Array<{ id: string; name: string; entityType: string }>;
+}
 
 // GET /api/timeline - Get timeline data
 export async function GET(request: NextRequest) {
@@ -95,11 +129,11 @@ export async function GET(request: NextRequest) {
 
 // Group notes and beats by granularity
 function groupByGranularity(
-  notes: any[],
-  beats: any[],
+  notes: NoteWithRelations[],
+  beats: BeatWithNote[],
   granularity: 'day' | 'week' | 'month' | 'year'
-) {
-  const groups: Record<string, any> = {};
+): TimelineGroup[] {
+  const groups: Record<string, TimelineGroup> = {};
 
   // Add notes to groups
   for (const note of notes) {
@@ -124,7 +158,7 @@ function groupByGranularity(
     
     // Add entities
     for (const em of note.entityMentions) {
-      if (!groups[key].entities.find((e: any) => e.id === em.entity.id)) {
+      if (!groups[key].entities.find((e) => e.id === em.entity.id)) {
         groups[key].entities.push(em.entity);
       }
     }
@@ -149,12 +183,12 @@ function groupByGranularity(
       intensity: beat.intensity,
       startedAt: beat.startedAt,
       endedAt: beat.endedAt,
-      note: beat.note,
+      note: beat.note ? { id: beat.note.id, title: beat.note.title } : null,
     });
   }
 
   // Sort groups by date
-  return Object.values(groups).sort((a: any, b: any) => 
+  return Object.values(groups).sort((a, b) => 
     a.date.localeCompare(b.date)
   );
 }

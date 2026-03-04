@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { Prisma } from '@prisma/client';
 
 // GET /api/connections - List connections
 export async function GET(request: NextRequest) {
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     // TODO: Add authentication
 
-    const where: any = {};
+    const where: Prisma.ConnectionWhereInput = {};
     
     if (noteId) {
       where.OR = [

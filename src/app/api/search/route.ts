@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { embed } from '@/lib/embeddings';
 
+interface SearchResult {
+  id: string;
+  title: string | null;
+  content: string;
+  content_plain: string | null;
+  note_type: string;
+  created_at: Date;
+  score: number;
+}
+
 // GET /api/search - Search notes
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +40,7 @@ export async function GET(request: NextRequest) {
     // const user = await getCurrentUser();
     // if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    let results: any[] = [];
+    let results: SearchResult[] = [];
 
     if (type === 'semantic' || type === 'hybrid') {
       // Generate embedding for query
@@ -52,7 +62,7 @@ export async function GET(request: NextRequest) {
         OFFSET ${offset}
       `;
       
-      results = semanticResults as any[];
+      results = semanticResults as SearchResult[];
     }
 
     if (type === 'keyword') {
@@ -71,7 +81,7 @@ export async function GET(request: NextRequest) {
         OFFSET ${offset}
       `;
       
-      results = keywordResults as any[];
+      results = keywordResults as SearchResult[];
     }
 
     // TODO: Hybrid search (combine semantic + keyword)

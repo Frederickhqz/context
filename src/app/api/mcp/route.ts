@@ -1,6 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { embed } from "@/lib/embeddings";
+import { Prisma } from "@prisma/client";
+
+// Types for MCP responses
+interface SemanticResult {
+  id: string;
+  title: string | null;
+  content_plain: string | null;
+  note_type: string;
+  created_at: Date;
+  score: number;
+}
+
+interface EntityInfo {
+  id: string;
+  name: string;
+  type?: string;
+  entityType?: string;
+  aliases?: string[];
+  context?: string | null;
+  mentionCount?: number;
+}
+
+interface TimelineGroup {
+  date: string;
+  notes: Array<{ id: string; title: string | null; type: string; createdAt: Date }>;
+  beats: Array<{ id: string; type: string; intensity: number; note: { id: string; title: string | null } | null }>;
+}
 
 // MCP Server implementation for Context
 // Exposes note-taking tools to AI agents
@@ -390,17 +417,17 @@ async function handleGetContext(args: Record<string, unknown>) {
     FROM notes n
     ORDER BY n.embedding <=> ${JSON.stringify(queryEmbedding)}::vector
     LIMIT ${maxResults}
-  ` as any[];
+  ` as SemanticResult[];
 
   // Fetch entities if requested
-  let entities: any[] = [];
+  let entities: EntityInfo[] = [];
   if (includeEntities && results.length > 0) {
     const noteIds = results.map(r => r.id);
     const mentions = await prisma.entityMention.findMany({
       where: { noteId: { in: noteIds } },
       include: { entity: true },
     });
-    entities = mentions.map(m => ({
+    entities = mentions.map((m): EntityInfo => ({
       id: m.entity.id,
       name: m.entity.name,
       type: m.entity.entityType,
@@ -540,7 +567,7 @@ async function handleSearchNotes(args: Record<string, unknown>) {
     };
   };
 
-  let results: any[] = [];
+  let results: SemanticResult[] = [];
 
   if (type === "semantic" || type === "hybrid") {
     try {
@@ -557,14 +584,14 @@ async function handleSearchNotes(args: Record<string, unknown>) {
           ${filters?.dateRange?.end ? prisma.$queryRaw`AND n.created_at <= ${filters.dateRange.end}::timestamp` : prisma.$queryRaw``}
         ORDER BY n.embedding <=> ${JSON.stringify(queryEmbedding)}::vector
         LIMIT ${limit}
-      ` as any[];
+      ` as SemanticResult[];
     } catch {
       // Fall back to keyword search
     }
   }
 
   if (type === "keyword" || (type === "hybrid" && results.length === 0)) {
-    const where: any = {
+    const where: Prisma.NoteWhereInput = {
       OR: [
         { title: { contains: query, mode: 'insensitive' } },
         { contentPlain: { contains: query, mode: 'insensitive' } },
@@ -587,7 +614,7 @@ async function handleSearchNotes(args: Record<string, unknown>) {
       orderBy: { createdAt: 'desc' },
     });
 
-    results = keywordResults.map(n => ({
+    results = keywordResults.map((n): SemanticResult => ({
       id: n.id,
       title: n.title,
       content_plain: n.contentPlain,
@@ -652,7 +679,7 @@ async function handleGetTimeline(args: Record<string, unknown>) {
   });
 
   // Group by granularity
-  const grouped: Record<string, any> = {};
+  const grouped: Record<string, TimelineGroup> = {};
   
   for (const note of notes) {
     const key = getDateKey(note.createdAt, granularity as 'day' | 'week' | 'month' | 'year');
@@ -672,11 +699,13 @@ async function handleGetTimeline(args: Record<string, unknown>) {
       id: beat.id,
       type: beat.beatType,
       intensity: beat.intensity,
-      note: beat.note,
+      note: beat.note ? { id: beat.note.id, title: beat.note.title } : null,
     });
   }
 
-  let connections: any[] = [];
+  let connections: Prisma.ConnectionGetPayload<{
+    include: { fromNote: { select: { id: true; title: true } }; toNote: { select: { id: true; title: true } } };
+  }>[] = [];
   if (includeConnections) {
     const noteIds = notes.map(n => n.id);
     connections = await prisma.connection.findMany({
@@ -700,7 +729,7 @@ async function handleGetTimeline(args: Record<string, unknown>) {
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         granularity,
-        timeline: Object.values(grouped).sort((a: any, b: any) => a.date.localeCompare(b.date)),
+        timeline: Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date)),
         connections: includeConnections ? connections : undefined,
       }, null, 2)
     }]
@@ -716,11 +745,12 @@ async function handleTraceConnection(args: Record<string, unknown>) {
   };
 
   // BFS to find paths
+  type PathInfo = { path: string[]; connections: Prisma.ConnectionGetPayload<{include: {toNote: {select: {id: true; title: true}}}}>[] };
   const visited = new Set<string>();
   const queue: Array<{ id: string; path: string[] }> = [{ id: from, path: [from] }];
-  const paths: Array<{ path: string[]; connections: any[] }> = [];
+  const paths: PathInfo[] = [];
 
-  const where: any = { fromNoteId: from };
+  const where: Prisma.ConnectionWhereInput = { fromNoteId: from };
   if (connectionTypes?.length) {
     where.connectionType = { in: connectionTypes };
   }
@@ -773,7 +803,7 @@ async function handleGetEntities(args: Record<string, unknown>) {
     limit?: number;
   };
 
-  let entities: any[];
+  let entities: EntityInfo[];
 
   if (noteId) {
     const mentions = await prisma.entityMention.findMany({
@@ -781,7 +811,7 @@ async function handleGetEntities(args: Record<string, unknown>) {
       include: { entity: true },
       take: limit,
     });
-    entities = mentions.map(m => ({
+    entities = mentions.map((m): EntityInfo => ({
       id: m.entity.id,
       name: m.entity.name,
       type: m.entity.entityType,
@@ -789,7 +819,7 @@ async function handleGetEntities(args: Record<string, unknown>) {
       context: m.context,
     }));
   } else {
-    const where: any = {};
+    const where: Prisma.EntityWhereInput = {};
     if (type) where.entityType = type;
 
     const results = await prisma.entity.findMany({
@@ -801,7 +831,7 @@ async function handleGetEntities(args: Record<string, unknown>) {
       },
     });
 
-    entities = results.map(e => ({
+    entities = results.map((e): EntityInfo => ({
       id: e.id,
       name: e.name,
       type: e.entityType,

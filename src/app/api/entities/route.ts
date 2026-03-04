@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
-import { Prisma } from '@prisma/client';
 
 // GET /api/entities - List entities
 export async function GET(request: NextRequest) {
@@ -14,7 +13,8 @@ export async function GET(request: NextRequest) {
     // TODO: Add authentication
     // const user = await getCurrentUser();
 
-    const where: Prisma.EntityWhereInput = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {};
     
     if (type) {
       where.entityType = type;

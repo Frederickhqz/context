@@ -1,19 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
-import { Prisma } from '@prisma/client';
 
-// Types for timeline data
-type NoteWithRelations = Prisma.NoteGetPayload<{
-  include: {
-    entityMentions: { include: { entity: true } };
-    beats: true;
-    tags: { include: { tag: true } };
-  };
-}>;
+// Local Type definitions (avoid Prisma client dependency during build)
+interface NoteWithRelations {
+  id: string;
+  title: string | null;
+  content: string;
+  contentPlain: string | null;
+  noteType: string;
+  createdAt: Date;
+  entityMentions: Array<{
+    entity: { id: string; name: string; entityType: string };
+  }>;
+  beats: Array<{
+    id: string;
+    beatType: string;
+    intensity: number;
+  }>;
+  tags: Array<{
+    tag: { id: string; name: string; color: string };
+  }>;
+}
 
-type BeatWithNote = Prisma.BeatGetPayload<{
-  include: { note: true };
-}>;
+interface BeatWithNote {
+  id: string;
+  beatType: string;
+  intensity: number;
+  startedAt: Date | null;
+  endedAt: Date | null;
+  createdAt: Date;
+  note: { id: string; title: string | null } | null;
+}
 
 interface TimelineGroup {
   date: string;

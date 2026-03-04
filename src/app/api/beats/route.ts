@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
-import { Prisma } from '@prisma/client';
 
 // GET /api/beats - List beats
 export async function GET(request: NextRequest) {
@@ -15,7 +14,8 @@ export async function GET(request: NextRequest) {
 
     // TODO: Add authentication
 
-    const where: Prisma.BeatWhereInput = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {};
     
     if (type) {
       where.beatType = type;
@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     }
     
     if (startDate || endDate) {
-      const orConditions: Prisma.BeatWhereInput[] = [
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orConditions: any[] = [
         { startedAt: {} },
         { createdAt: {} },
       ];
@@ -39,13 +40,13 @@ export async function GET(request: NextRequest) {
       if (endDate) {
         orConditions[0] = { 
           startedAt: { 
-            ...(orConditions[0] as { startedAt: { gte?: Date } }).startedAt,
+            ...orConditions[0].startedAt,
             lte: new Date(endDate) 
           } 
         };
         orConditions[1] = { 
           createdAt: { 
-            ...(orConditions[1] as { createdAt: { gte?: Date } }).createdAt,
+            ...orConditions[1].createdAt,
             lte: new Date(endDate) 
           } 
         };
@@ -179,7 +180,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting beat:', error);
+    console.error('Error deleting beats:', error);
     return NextResponse.json(
       { error: 'Failed to delete beat' },
       { status: 500 }

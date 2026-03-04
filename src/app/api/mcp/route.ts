@@ -44,6 +44,16 @@ interface EntityWithCount {
   _count: { mentions: number };
 }
 
+// Local type for beat with note
+interface BeatWithNote {
+  id: string;
+  beatType: string;
+  intensity: number;
+  startedAt: Date | null;
+  createdAt: Date;
+  note: { id: string; title: string | null } | null;
+}
+
 interface EntityInfo {
   id: string;
   name: string;
@@ -696,7 +706,7 @@ async function handleGetTimeline(args: Record<string, unknown>) {
     },
     orderBy: { createdAt: 'asc' },
     take: 100,
-  });
+  }) as NoteResult[];
 
   const beats = await prisma.beat.findMany({
     where: {
@@ -708,7 +718,7 @@ async function handleGetTimeline(args: Record<string, unknown>) {
     orderBy: { startedAt: 'asc' },
     include: { note: { select: { id: true, title: true } } },
     take: 50,
-  });
+  }) as BeatWithNote[];
 
   // Group by granularity
   const grouped: Record<string, TimelineGroup> = {};

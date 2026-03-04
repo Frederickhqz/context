@@ -2,35 +2,60 @@
 
 import { cn } from "@/lib/utils/cn";
 import { Icon } from "@/components/ui/Icon";
+import { createDemoNote, isDemoMode } from "@/lib/demo/client";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function NewNotePage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    
+    if (!content.trim()) {
+      setError("Content is required");
+      return;
+    }
+
     setIsSaving(true);
+    setError(null);
 
     try {
-      const response = await fetch("/api/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title || null,
+      if (isDemoMode()) {
+        // Demo mode - save to localStorage
+        createDemoNote({
+          title: title || undefined,
           content,
           noteType: "note",
-        }),
-      });
+        });
+        router.push("/notes");
+        router.refresh();
+      } else {
+        // Production mode - save to API
+        const response = await fetch("/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title || null,
+            content,
+            noteType: "note",
+          }),
+        });
 
-      if (response.ok) {
-        const note = await response.json();
-        window.location.href = `/notes`;
+        if (!response.ok) {
+          throw new Error("Failed to save note");
+        }
+
+        router.push("/notes");
       }
-    } catch (error) {
-      console.error("Failed to save note:", error);
+    } catch (err) {
+      console.error("Failed to save note:", err);
+      setError("Failed to save note. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -46,9 +71,7 @@ export default function NewNotePage() {
               href="/notes"
               className="rounded-lg p-2 hover:bg-muted transition-colors"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <Icon name="arrowLeft" size="md" />
             </Link>
             <h1 className="text-lg font-medium">New Note</h1>
           </div>
@@ -89,6 +112,13 @@ export default function NewNotePage() {
             autoFocus
             className="flex-1 w-full min-h-[60vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/50 text-base leading-relaxed"
           />
+
+          {/* Error */}
+          {error && (
+            <div className="rounded-lg bg-destructive/10 text-destructive px-4 py-2 text-sm">
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Toolbar */}
@@ -113,6 +143,13 @@ export default function NewNotePage() {
               <Icon name="calendar" size="sm" />
               Date
             </button>
+            
+            {/* Demo mode indicator */}
+            {isDemoMode() && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                Demo mode - notes saved locally
+              </span>
+            )}
           </div>
         </div>
       </form>

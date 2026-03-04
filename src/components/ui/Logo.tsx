@@ -23,73 +23,49 @@ const textSizeClasses = {
 export function Logo({ size = "md", showText = true, className }: LogoProps) {
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      {/* Logo Mark - Connected nodes forming a "C" */}
+      {/* Logo Mark - C made of connected nodes */}
       <svg
         className={cn(sizeClasses[size])}
         viewBox="0 0 32 32"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Gradient definitions */}
         <defs>
-          <linearGradient
-            id="context-gradient"
-            x1="0%"
-            y1="0%"
-            x2="100%"
-            y2="100%"
-          >
-            <stop offset="0%" stopColor="#818CF8" />
+          <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#A5B4FC" />
             <stop offset="50%" stopColor="#6366F1" />
             <stop offset="100%" stopColor="#4F46E5" />
           </linearGradient>
-          <linearGradient
-            id="context-gradient-light"
-            x1="0%"
-            y1="0%"
-            x2="100%"
-            y2="100%"
-          >
-            <stop offset="0%" stopColor="#A5B4FC" />
-            <stop offset="100%" stopColor="#818CF8" />
-          </linearGradient>
         </defs>
 
-        {/* Background circle */}
-        <circle
-          cx="16"
-          cy="16"
-          r="15"
-          fill="url(#context-gradient)"
-        />
-
-        {/* Connection lines */}
+        {/* C curve (connecting path) */}
         <path
-          d="M16 8 L16 16 L24 16"
-          stroke="white"
-          strokeWidth="2"
+          d="M22 6 C10 6 6 12 6 16 C6 20 10 26 22 26"
+          stroke="url(#logo-gradient)"
+          strokeWidth="2.5"
           strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity="0.4"
-        />
-        <path
-          d="M8 16 L16 16 L16 24"
-          stroke="white"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity="0.4"
+          fill="none"
+          opacity="0.5"
         />
 
-        {/* Main "C" shape made of connected nodes */}
-        <circle cx="16" cy="8" r="2.5" fill="white" />
-        <circle cx="24" cy="16" r="2.5" fill="white" />
-        <circle cx="16" cy="16" r="3" fill="url(#context-gradient-light)" />
-        <circle cx="8" cy="16" r="2.5" fill="white" />
-        <circle cx="16" cy="24" r="2.5" fill="white" />
+        {/* Nodes forming the C shape */}
+        {/* Top end */}
+        <circle cx="20" cy="6" r="4" fill="url(#logo-gradient)" />
+        <circle cx="20" cy="6" r="2" fill="white" opacity="0.5" />
 
-        {/* Connection highlights */}
-        <circle cx="16" cy="16" r="1.5" fill="white" opacity="0.9" />
+        {/* Top curve */}
+        <circle cx="12" cy="9" r="3" fill="url(#logo-gradient)" />
+
+        {/* Left side (inner) */}
+        <circle cx="8" cy="14" r="2.5" fill="url(#logo-gradient)" />
+        <circle cx="8" cy="18" r="2.5" fill="url(#logo-gradient)" />
+
+        {/* Bottom curve */}
+        <circle cx="12" cy="23" r="3" fill="url(#logo-gradient)" />
+
+        {/* Bottom end */}
+        <circle cx="20" cy="26" r="4" fill="url(#logo-gradient)" />
+        <circle cx="20" cy="26" r="2" fill="white" opacity="0.5" />
       </svg>
 
       {/* Wordmark */}
@@ -114,46 +90,32 @@ export function LogoMark({ size = "md", className }: { size?: "sm" | "md" | "lg"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <linearGradient
-          id="context-mark-gradient"
-          x1="0%"
-          y1="0%"
-          x2="100%"
-          y2="100%"
-        >
-          <stop offset="0%" stopColor="#818CF8" />
+        <linearGradient id="mark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#A5B4FC" />
           <stop offset="50%" stopColor="#6366F1" />
           <stop offset="100%" stopColor="#4F46E5" />
         </linearGradient>
       </defs>
 
-      <circle cx="16" cy="16" r="15" fill="url(#context-mark-gradient)" />
-
-      {/* Connection lines */}
+      {/* C curve */}
       <path
-        d="M16 8 L16 16 L24 16"
-        stroke="white"
-        strokeWidth="2"
+        d="M22 6 C10 6 6 12 6 16 C6 20 10 26 22 26"
+        stroke="url(#mark-gradient)"
+        strokeWidth="2.5"
         strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.4"
-      />
-      <path
-        d="M8 16 L16 16 L16 24"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.4"
+        fill="none"
+        opacity="0.5"
       />
 
       {/* Nodes */}
-      <circle cx="16" cy="8" r="2.5" fill="white" />
-      <circle cx="24" cy="16" r="2.5" fill="white" />
-      <circle cx="16" cy="16" r="3" fill="white" opacity="0.5" />
-      <circle cx="8" cy="16" r="2.5" fill="white" />
-      <circle cx="16" cy="24" r="2.5" fill="white" />
-      <circle cx="16" cy="16" r="1.5" fill="white" opacity="0.9" />
+      <circle cx="20" cy="6" r="4" fill="url(#mark-gradient)" />
+      <circle cx="20" cy="6" r="2" fill="white" opacity="0.5" />
+      <circle cx="12" cy="9" r="3" fill="url(#mark-gradient)" />
+      <circle cx="8" cy="14" r="2.5" fill="url(#mark-gradient)" />
+      <circle cx="8" cy="18" r="2.5" fill="url(#mark-gradient)" />
+      <circle cx="12" cy="23" r="3" fill="url(#mark-gradient)" />
+      <circle cx="20" cy="26" r="4" fill="url(#mark-gradient)" />
+      <circle cx="20" cy="26" r="2" fill="white" opacity="0.5" />
     </svg>
   );
 }

@@ -1,11 +1,49 @@
+"use client";
+
 import { NoteCard } from "@/components/notes/NoteCard";
 import { CreateNoteButton } from "@/components/notes/CreateNoteButton";
-import { prisma } from "@/lib/db/client";
-import { formatDistanceToNow } from "date-fns";
+import { useEffect, useState } from "react";
+import { getDemoNotes, isDemoMode, type DemoNote } from "@/lib/demo/client";
 
-export default async function NotesPage() {
-  // Mock data for now - will be replaced with real data
-  const notes = await getNotes();
+export default function NotesPage() {
+  const [notes, setNotes] = useState<DemoNote[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadNotes() {
+      try {
+        if (isDemoMode()) {
+          // Demo mode - load from localStorage
+          const demoNotes = getDemoNotes();
+          setNotes(demoNotes);
+        } else {
+          // Production mode - load from API
+          const response = await fetch("/api/notes");
+          const data = await response.json();
+          setNotes(data.notes || []);
+        }
+      } catch (error) {
+        console.error("Failed to load notes:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadNotes();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Notes</h1>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -15,6 +53,7 @@ export default async function NotesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Notes</h1>
           <p className="text-muted-foreground">
             Your thoughts, ideas, and memories
+            {isDemoMode() && <span className="text-amber-600 ml-2">(Demo mode)</span>}
           </p>
         </div>
         <CreateNoteButton />
@@ -43,19 +82,4 @@ export default async function NotesPage() {
       )}
     </div>
   );
-}
-
-async function getNotes(): Promise<Note[]> {
-  // TODO: Add authentication
-  // For now, return empty array
-  return [];
-}
-
-interface Note {
-  id: string;
-  title: string | null;
-  content: string;
-  contentPlain: string | null;
-  noteType: string;
-  createdAt: Date;
 }

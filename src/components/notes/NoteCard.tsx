@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils/cn";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, parseISO } from "date-fns";
 
 interface NoteCardProps {
   note: {
@@ -8,7 +8,7 @@ interface NoteCardProps {
     content: string;
     contentPlain?: string | null;
     noteType?: string;
-    createdAt: Date;
+    createdAt: Date | string;
   };
   compact?: boolean;
 }
@@ -19,6 +19,11 @@ export function NoteCard({ note, compact }: NoteCardProps) {
     journal: "bg-pink-500/10 text-pink-600 border-pink-500/20",
     beat: "bg-amber-500/10 text-amber-600 border-amber-500/20",
   };
+
+  // Handle both Date and string formats
+  const createdAt = typeof note.createdAt === "string" 
+    ? parseISO(note.createdAt) 
+    : note.createdAt;
 
   return (
     <div
@@ -42,7 +47,7 @@ export function NoteCard({ note, compact }: NoteCardProps) {
       </p>
       
       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{formatDistanceToNow(note.createdAt, { addSuffix: true })}</span>
+        <span>{formatDistanceToNow(createdAt, { addSuffix: true })}</span>
         {note.noteType && note.noteType !== "note" && (
           <span className={cn(
             "rounded px-2 py-0.5 border",

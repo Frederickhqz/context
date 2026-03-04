@@ -4,7 +4,7 @@
 const DEMO_USER_ID = "demo-user";
 
 // Types
-interface DemoNote {
+export interface DemoNote {
   id: string;
   userId: string;
   title: string | null;
@@ -16,7 +16,7 @@ interface DemoNote {
   metadata: Record<string, unknown> | null;
 }
 
-interface DemoEntity {
+export interface DemoEntity {
   id: string;
   userId: string;
   name: string;
@@ -26,7 +26,7 @@ interface DemoEntity {
   createdAt: string;
 }
 
-interface DemoCollection {
+export interface DemoCollection {
   id: string;
   userId: string;
   name: string;
@@ -36,7 +36,7 @@ interface DemoCollection {
   createdAt: string;
 }
 
-interface DemoBeat {
+export interface DemoBeat {
   id: string;
   userId: string;
   noteId: string;
@@ -231,8 +231,7 @@ export function createDemoBeat(data: {
   return beat;
 }
 
-// Connections
-interface DemoConnection {
+export interface DemoConnection {
   id: string;
   userId: string;
   fromNoteId: string;

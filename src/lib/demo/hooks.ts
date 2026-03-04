@@ -8,8 +8,8 @@ import {
   deleteDemoNote,
   searchDemoNotes,
   isDemoMode,
-  type DemoNote,
 } from "@/lib/demo/client";
+import type { DemoNote } from "@/lib/demo/client";
 
 export function useDemoNotes() {
   const [notes, setNotes] = useState<DemoNote[]>([]);

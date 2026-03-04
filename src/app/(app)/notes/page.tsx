@@ -3,7 +3,8 @@
 import { NoteCard } from "@/components/notes/NoteCard";
 import { CreateNoteButton } from "@/components/notes/CreateNoteButton";
 import { useEffect, useState } from "react";
-import { getDemoNotes, isDemoMode, type DemoNote } from "@/lib/demo/client";
+import { getDemoNotes, isDemoMode } from "@/lib/demo/client";
+import type { DemoNote } from "@/lib/demo/client";
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<DemoNote[]>([]);

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { embed } from "@/lib/embeddings";
-import { Prisma } from "@prisma/client";
 
 // Types for MCP responses
 interface SemanticResult {
@@ -591,7 +590,8 @@ async function handleSearchNotes(args: Record<string, unknown>) {
   }
 
   if (type === "keyword" || (type === "hybrid" && results.length === 0)) {
-    const where: Prisma.NoteWhereInput = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {
       OR: [
         { title: { contains: query, mode: 'insensitive' } },
         { contentPlain: { contains: query, mode: 'insensitive' } },
@@ -703,9 +703,8 @@ async function handleGetTimeline(args: Record<string, unknown>) {
     });
   }
 
-  let connections: Prisma.ConnectionGetPayload<{
-    include: { fromNote: { select: { id: true; title: true } }; toNote: { select: { id: true; title: true } } };
-  }>[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let connections: any[] = [];
   if (includeConnections) {
     const noteIds = notes.map(n => n.id);
     connections = await prisma.connection.findMany({
@@ -745,12 +744,14 @@ async function handleTraceConnection(args: Record<string, unknown>) {
   };
 
   // BFS to find paths
-  type PathInfo = { path: string[]; connections: Prisma.ConnectionGetPayload<{include: {toNote: {select: {id: true; title: true}}}}>[] };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type PathInfo = { path: string[]; connections: any[] };
   const visited = new Set<string>();
   const queue: Array<{ id: string; path: string[] }> = [{ id: from, path: [from] }];
   const paths: PathInfo[] = [];
 
-  const where: Prisma.ConnectionWhereInput = { fromNoteId: from };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: any = { fromNoteId: from };
   if (connectionTypes?.length) {
     where.connectionType = { in: connectionTypes };
   }
@@ -819,7 +820,8 @@ async function handleGetEntities(args: Record<string, unknown>) {
       context: m.context,
     }));
   } else {
-    const where: Prisma.EntityWhereInput = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {};
     if (type) where.entityType = type;
 
     const results = await prisma.entity.findMany({

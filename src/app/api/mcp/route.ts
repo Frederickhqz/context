@@ -21,6 +21,20 @@ interface NoteResult {
   createdAt: Date;
 }
 
+// Local type for entity mentions with included entity
+interface EntityMentionWithEntity {
+  id: string;
+  noteId: string;
+  entityId: string;
+  context: string | null;
+  entity: {
+    id: string;
+    name: string;
+    entityType: string;
+    aliases: string[];
+  };
+}
+
 interface EntityInfo {
   id: string;
   name: string;
@@ -435,7 +449,7 @@ async function handleGetContext(args: Record<string, unknown>) {
       where: { noteId: { in: noteIds } },
       include: { entity: true },
     });
-    entities = mentions.map((m): EntityInfo => ({
+    entities = mentions.map((m: EntityMentionWithEntity): EntityInfo => ({
       id: m.entity.id,
       name: m.entity.name,
       type: m.entity.entityType,
@@ -821,7 +835,7 @@ async function handleGetEntities(args: Record<string, unknown>) {
       include: { entity: true },
       take: limit,
     });
-    entities = mentions.map((m): EntityInfo => ({
+    entities = mentions.map((m: EntityMentionWithEntity): EntityInfo => ({
       id: m.entity.id,
       name: m.entity.name,
       type: m.entity.entityType,

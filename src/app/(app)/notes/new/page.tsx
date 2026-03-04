@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
+import { Icon } from "@/components/ui/Icon";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -107,9 +108,10 @@ export default function NewNotePage() {
             </button>
             <button
               type="button"
-              className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
+              className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors inline-flex items-center gap-1.5"
             >
-              📅 Date
+              <Icon name="calendar" size="sm" />
+              Date
             </button>
           </div>
         </div>

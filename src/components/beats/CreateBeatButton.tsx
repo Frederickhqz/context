@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { Icon } from '@/components/ui/Icon';
 
 interface CreateBeatButtonProps {
   noteId?: string;
@@ -14,10 +15,10 @@ export function CreateBeatButton({ noteId, onCreated, className }: CreateBeatBut
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const beatTypes = [
-    { value: 'event', label: 'Event', icon: '📅', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
-    { value: 'milestone', label: 'Milestone', icon: '🏆', color: 'bg-green-500/10 text-green-600 border-green-500/20' },
-    { value: 'feeling', label: 'Feeling', icon: '💭', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
-    { value: 'insight', label: 'Insight', icon: '💡', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
+    { value: 'event', label: 'Event', icon: 'calendar', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+    { value: 'milestone', label: 'Milestone', icon: 'check', color: 'bg-green-500/10 text-green-600 border-green-500/20' },
+    { value: 'feeling', label: 'Feeling', icon: 'sparkles', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
+    { value: 'insight', label: 'Insight', icon: 'lightbulb', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
   ];
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -64,7 +65,7 @@ export function CreateBeatButton({ noteId, onCreated, className }: CreateBeatBut
           className
         )}
       >
-        <span>🎵</span>
+        <Icon name="bolt" size="sm" />
         New Beat
       </button>
 
@@ -81,9 +82,7 @@ export function CreateBeatButton({ noteId, onCreated, className }: CreateBeatBut
                 onClick={() => setIsOpen(false)}
                 className="rounded-lg p-2 hover:bg-muted"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <Icon name="close" size="md" />
               </button>
             </div>
 
@@ -109,7 +108,7 @@ export function CreateBeatButton({ noteId, onCreated, className }: CreateBeatBut
                         className="sr-only"
                         required
                       />
-                      <span className="text-xl">{type.icon}</span>
+                      <Icon name={type.icon} size="md" className={type.color.split(' ')[1]} />
                       <span className="text-sm font-medium">{type.label}</span>
                     </label>
                   ))}

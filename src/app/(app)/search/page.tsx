@@ -1,5 +1,6 @@
 import { SearchBar } from '@/components/search/SearchBar';
 import { SearchResults } from '@/components/search/SearchResults';
+import { Icon } from '@/components/ui/Icon';
 
 interface SearchPageProps {
   searchParams: {
@@ -34,9 +35,7 @@ export default function SearchPage({ searchParams }: SearchPageProps) {
       {!query && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="rounded-full bg-muted p-4 mb-4">
-            <svg className="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <Icon name="search" size="lg" className="text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium">Search your notes</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
@@ -44,15 +43,15 @@ export default function SearchPage({ searchParams }: SearchPageProps) {
           </p>
           <div className="mt-6 space-y-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-3">
-              <span className="text-lg">💡</span>
+              <Icon name="lightbulb" size="md" className="text-amber-500 shrink-0" />
               <span>Try searching for concepts like "project planning" or "meeting notes"</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-lg">🔍</span>
+              <Icon name="search" size="md" className="text-blue-500 shrink-0" />
               <span>Semantic search understands meaning, not just keywords</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-lg">⚡</span>
+              <Icon name="bolt" size="md" className="text-purple-500 shrink-0" />
               <span>Use @ to find mentions of people or # for tags</span>
             </div>
           </div>

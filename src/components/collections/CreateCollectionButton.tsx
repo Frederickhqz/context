@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils/cn';
+import { Icon } from '@/components/ui/Icon';
 import { useState } from 'react';
 
 interface CreateCollectionButtonProps {
@@ -21,7 +22,7 @@ export function CreateCollectionButton({ className }: CreateCollectionButtonProp
     '#14B8A6', // Teal
   ];
 
-  const icons = ['📁', '📚', '🏷️', '📌', '🔖', '📋', '🗂️', '✨'];
+  const iconNames = ['folder', 'bookOpen', 'tag', 'pin', 'bookmark', 'clipboardList', 'file', 'sparkles'];
 
   return (
     <>
@@ -35,9 +36,7 @@ export function CreateCollectionButton({ className }: CreateCollectionButtonProp
           className
         )}
       >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
+        <Icon name="plus" size="sm" />
         New Collection
       </button>
 
@@ -54,9 +53,7 @@ export function CreateCollectionButton({ className }: CreateCollectionButtonProp
                 onClick={() => setIsOpen(false)}
                 className="rounded-lg p-2 hover:bg-muted"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <Icon name="close" size="md" />
               </button>
             </div>
 
@@ -97,13 +94,13 @@ export function CreateCollectionButton({ className }: CreateCollectionButtonProp
               <div>
                 <label className="block text-sm font-medium mb-2">Icon</label>
                 <div className="flex flex-wrap gap-2">
-                  {icons.map((icon) => (
+                  {iconNames.map((iconName) => (
                     <button
-                      key={icon}
+                      key={iconName}
                       type="button"
-                      className="w-10 h-10 rounded-lg border bg-background hover:bg-muted transition-colors text-lg"
+                      className="w-10 h-10 rounded-lg border bg-background hover:bg-muted transition-colors flex items-center justify-center"
                     >
-                      {icon}
+                      <Icon name={iconName} size="md" />
                     </button>
                   ))}
                 </div>

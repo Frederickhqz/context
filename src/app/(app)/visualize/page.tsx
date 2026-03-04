@@ -3,6 +3,7 @@ import { GraphView } from '@/components/graph/GraphView';
 import { TreeView, buildTreeFromConnections } from '@/components/tree/TreeView';
 import { prisma } from '@/lib/db/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import { Icon } from '@/components/ui/Icon';
 
 // Force dynamic rendering - no static generation
 export const dynamic = 'force-dynamic';
@@ -153,9 +154,18 @@ export default async function VisualizePage() {
       {/* Tabs */}
       <Tabs defaultValue="calendar">
         <TabsList>
-          <TabsTrigger value="calendar">📅 Calendar</TabsTrigger>
-          <TabsTrigger value="graph">🔗 Graph</TabsTrigger>
-          <TabsTrigger value="tree">🌲 Tree</TabsTrigger>
+          <TabsTrigger value="calendar">
+            <Icon name="calendar" size="sm" className="mr-1.5" />
+            Calendar
+          </TabsTrigger>
+          <TabsTrigger value="graph">
+            <Icon name="graph" size="sm" className="mr-1.5" />
+            Graph
+          </TabsTrigger>
+          <TabsTrigger value="tree">
+            <Icon name="tree" size="sm" className="mr-1.5" />
+            Tree
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="calendar" className="mt-6">
@@ -171,7 +181,9 @@ export default async function VisualizePage() {
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <div className="text-center">
-                  <div className="text-4xl mb-2">🔗</div>
+                  <div className="mb-4 flex justify-center">
+                    <Icon name="graph" size="lg" className="text-muted-foreground" />
+                  </div>
                   <p>No connections to display</p>
                   <p className="text-sm">Create notes and connect them to see the graph</p>
                 </div>
@@ -187,7 +199,9 @@ export default async function VisualizePage() {
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <div className="text-center">
-                  <div className="text-4xl mb-2">🌲</div>
+                  <div className="mb-4 flex justify-center">
+                    <Icon name="tree" size="lg" className="text-muted-foreground" />
+                  </div>
                   <p>No connections to display</p>
                   <p className="text-sm">Create hierarchical connections to see the tree view</p>
                 </div>

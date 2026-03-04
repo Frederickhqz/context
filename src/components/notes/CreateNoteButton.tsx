@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils/cn";
+import { Icon } from "@/components/ui/Icon";
 import Link from "next/link";
 
 interface CreateNoteButtonProps {
@@ -17,9 +18,7 @@ export function CreateNoteButton({ className }: CreateNoteButtonProps) {
         className
       )}
     >
-      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-      </svg>
+      <Icon name="plus" size="sm" />
       New Note
     </Link>
   );

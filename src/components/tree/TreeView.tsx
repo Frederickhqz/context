@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { Icon } from '@/components/ui/Icon';
 
 interface TreeNode {
   id: string;
@@ -40,9 +41,9 @@ function TreeNodeComponent({ node, level, onNodeClick }: TreeNodeProps) {
   const hasChildren = node.children && node.children.length > 0;
 
   const typeIcons: Record<string, string> = {
-    note: '📝',
-    entity: '🏷️',
-    collection: '📁',
+    note: 'file',
+    entity: 'tag',
+    collection: 'folder',
   };
 
   const typeColors: Record<string, string> = {
@@ -88,7 +89,7 @@ function TreeNodeComponent({ node, level, onNodeClick }: TreeNodeProps) {
         )}
 
         {/* Icon */}
-        <span className="text-sm">{typeIcons[node.type] || '📌'}</span>
+        <Icon name={typeIcons[node.type] || 'tag'} size="sm" className={typeColors[node.type]} />
 
         {/* Label */}
         <span className={cn('text-sm', typeColors[node.type])}>

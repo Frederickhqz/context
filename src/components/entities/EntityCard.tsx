@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils/cn';
+import { Icon } from '@/components/ui/Icon';
 
 interface EntityCardProps {
   entity: {
@@ -21,11 +22,11 @@ export function EntityCard({ entity }: EntityCardProps) {
   };
 
   const typeIcons: Record<string, string> = {
-    person: '👤',
-    place: '📍',
-    project: '📁',
-    concept: '💡',
-    event: '📅',
+    person: 'person',
+    place: 'place',
+    project: 'folder',
+    concept: 'lightbulb',
+    event: 'calendar',
   };
 
   return (
@@ -38,9 +39,12 @@ export function EntityCard({ entity }: EntityCardProps) {
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-2xl" title={entity.entityType}>
-            {typeIcons[entity.entityType] || '📌'}
-          </span>
+          <div className={cn(
+            'rounded-lg p-2',
+            typeColors[entity.entityType]?.split(' ')[0] || 'bg-muted'
+          )}>
+            <Icon name={typeIcons[entity.entityType] || 'tag'} size="md" />
+          </div>
           <div>
             <h3 className="font-medium text-foreground line-clamp-1">
               {entity.name}

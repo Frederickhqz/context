@@ -2,7 +2,6 @@ import { CalendarView } from '@/components/calendar/CalendarView';
 import { GraphView } from '@/components/graph/GraphView';
 import { TreeView, buildTreeFromConnections } from '@/components/tree/TreeView';
 import { prisma } from '@/lib/db/client';
-import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 
 // Force dynamic rendering - no static generation
@@ -52,84 +51,94 @@ interface GraphLink {
 }
 
 export default async function VisualizePage() {
-  // TODO: Add authentication
+  let calendarEvents: CalendarEvent[] = [];
+  let graphNodes: GraphNode[] = [];
+  let graphLinks: GraphLink[] = [];
+  let treeData: any = null;
 
-  // Fetch notes for calendar
-  const notes = await prisma.note.findMany({
-    take: 100,
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      title: true,
-      createdAt: true,
-    },
-  });
+  try {
+    // TODO: Add authentication
 
-  // Fetch beats for calendar
-  const beats = await prisma.beat.findMany({
-    take: 50,
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      beatType: true,
-      createdAt: true,
-      startedAt: true,
-    },
-  });
+    // Fetch notes for calendar
+    const notes = await prisma.note.findMany({
+      take: 100,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+      },
+    });
 
-  // Fetch connections for graph/tree
-  const connections = await prisma.connection.findMany({
-    take: 100,
-    include: {
-      fromNote: { select: { id: true, title: true } },
-      toNote: { select: { id: true, title: true } },
-    },
-  });
+    // Fetch beats for calendar
+    const beats = await prisma.beat.findMany({
+      take: 50,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        beatType: true,
+        createdAt: true,
+        startedAt: true,
+      },
+    });
 
-  // Prepare calendar events
-  const calendarEvents: CalendarEvent[] = [
-    ...notes.map((n: NoteSelect) => ({
-      id: n.id,
-      date: n.createdAt,
-      type: 'note' as const,
-      title: n.title || undefined,
-    })),
-    ...beats.map((b: BeatSelect) => ({
-      id: b.id,
-      date: b.startedAt || b.createdAt,
-      type: 'beat' as const,
-      title: b.beatType,
-    })),
-  ];
+    // Fetch connections for graph/tree
+    const connections = await prisma.connection.findMany({
+      take: 100,
+      include: {
+        fromNote: { select: { id: true, title: true } },
+        toNote: { select: { id: true, title: true } },
+      },
+    });
 
-  // Prepare graph nodes
-  const noteIds = new Set<string>();
-  connections.forEach((c: ConnectionWithNotes) => {
-    noteIds.add(c.fromNoteId);
-    noteIds.add(c.toNoteId);
-  });
+    // Prepare calendar events
+    calendarEvents = [
+      ...notes.map((n: NoteSelect) => ({
+        id: n.id,
+        date: n.createdAt,
+        type: 'note' as const,
+        title: n.title || undefined,
+      })),
+      ...beats.map((b: BeatSelect) => ({
+        id: b.id,
+        date: b.startedAt || b.createdAt,
+        type: 'beat' as const,
+        title: b.beatType,
+      })),
+    ];
 
-  const graphNodes: GraphNode[] = Array.from(noteIds).map((id: string) => {
-    const note = connections.find((c: ConnectionWithNotes) => c.fromNoteId === id)?.fromNote ||
-                 connections.find((c: ConnectionWithNotes) => c.toNoteId === id)?.toNote;
-    return {
-      id,
-      label: note?.title || `Note ${id.slice(0, 4)}`,
-      type: 'note' as const,
-    };
-  });
+    // Prepare graph nodes
+    const noteIds = new Set<string>();
+    connections.forEach((c: ConnectionWithNotes) => {
+      noteIds.add(c.fromNoteId);
+      noteIds.add(c.toNoteId);
+    });
 
-  const graphLinks: GraphLink[] = connections.map((c: ConnectionWithNotes) => ({
-    source: c.fromNoteId,
-    target: c.toNoteId,
-    type: c.connectionType as 'reference' | 'semantic' | 'temporal',
-    strength: c.strength,
-  }));
+    graphNodes = Array.from(noteIds).map((id: string) => {
+      const note = connections.find((c: ConnectionWithNotes) => c.fromNoteId === id)?.fromNote ||
+        connections.find((c: ConnectionWithNotes) => c.toNoteId === id)?.toNote;
+      return {
+        id,
+        label: note?.title || `Note ${id.slice(0, 4)}`,
+        type: 'note' as const,
+      };
+    });
 
-  // Build tree from first connection if available
-  const treeData = connections.length > 0
-    ? buildTreeFromConnections(connections[0].fromNoteId, connections as ConnectionWithNotes[])
-    : null;
+    graphLinks = connections.map((c: ConnectionWithNotes) => ({
+      source: c.fromNoteId,
+      target: c.toNoteId,
+      type: c.connectionType as 'reference' | 'semantic' | 'temporal',
+      strength: c.strength,
+    }));
+
+    // Build tree from first connection if available
+    treeData = connections.length > 0
+      ? buildTreeFromConnections(connections[0].fromNoteId, connections as ConnectionWithNotes[])
+      : null;
+  } catch (error) {
+    console.error('Failed to fetch visualize data:', error);
+    // Return empty state on error
+  }
 
   return (
     <div className="space-y-6">

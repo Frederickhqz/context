@@ -6,35 +6,42 @@ import { format, subDays } from 'date-fns';
 export const dynamic = 'force-dynamic';
 
 export default async function TimelinePage() {
-  // Get last 30 days by default
-  const end = new Date();
-  const start = subDays(end, 30);
+  let grouped: any[] = [];
 
-  // TODO: Add authentication
-  const notes = await prisma.note.findMany({
-    where: {
-      createdAt: {
-        gte: start,
-        lte: end,
+  try {
+    // Get last 30 days by default
+    const end = new Date();
+    const start = subDays(end, 30);
+
+    // TODO: Add authentication
+    const notes = await prisma.note.findMany({
+      where: {
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
       },
-    },
-    orderBy: { createdAt: 'asc' },
-    take: 100,
-  });
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
 
-  const beats = await prisma.beat.findMany({
-    where: {
-      startedAt: {
-        gte: start,
-        lte: end,
+    const beats = await prisma.beat.findMany({
+      where: {
+        startedAt: {
+          gte: start,
+          lte: end,
+        },
       },
-    },
-    orderBy: { startedAt: 'asc' },
-    include: { note: true },
-  });
+      orderBy: { startedAt: 'asc' },
+      include: { note: true },
+    });
 
-  // Group by date
-  const grouped = groupByDate(notes, beats);
+    // Group by date
+    grouped = groupByDate(notes, beats);
+  } catch (error) {
+    console.error('Failed to fetch timeline data:', error);
+    // Return empty state on error
+  }
 
   return (
     <div className="space-y-6">
@@ -93,7 +100,7 @@ function groupByDate(notes: any[], beats: any[]) {
     groups[key].beats.push(beat);
   }
 
-  return Object.values(groups).sort((a: any, b: any) => 
+  return Object.values(groups).sort((a: any, b: any) =>
     b.date.localeCompare(a.date)
   );
 }

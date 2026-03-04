@@ -17,19 +17,33 @@ interface EntityWithCount {
 }
 
 export default async function EntitiesPage() {
-  // TODO: Add authentication
-  const entities = await prisma.entity.findMany({
-    take: 50,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      _count: {
-        select: { mentions: true },
-      },
-    },
-  });
+  let entities: any[] = [];
+  let grouped: Record<string, any[]> = {
+    person: [],
+    place: [],
+    project: [],
+    concept: [],
+    event: [],
+  };
 
-  // Group by type
-  const grouped = groupByType(entities);
+  try {
+    // TODO: Add authentication
+    entities = await prisma.entity.findMany({
+      take: 50,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: { mentions: true },
+        },
+      },
+    });
+
+    // Group by type
+    grouped = groupByType(entities);
+  } catch (error) {
+    console.error('Failed to fetch entities:', error);
+    // Return empty state on error
+  }
 
   return (
     <div className="space-y-6">
@@ -45,20 +59,22 @@ export default async function EntitiesPage() {
 
       {/* Entity groups */}
       {Object.entries(grouped).map(([type, typeEntities]) => (
-        <div key={type} className="space-y-3">
-          <h2 className="text-lg font-medium capitalize">{type}s</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(typeEntities as EntityWithCount[]).map((entity) => (
-              <EntityCard
-                key={entity.id}
-                entity={{
-                  ...entity,
-                  mentionCount: entity._count.mentions,
-                }}
-              />
-            ))}
+        typeEntities.length > 0 && (
+          <div key={type} className="space-y-3">
+            <h2 className="text-lg font-medium capitalize">{type}s</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {(typeEntities as EntityWithCount[]).map((entity) => (
+                <EntityCard
+                  key={entity.id}
+                  entity={{
+                    ...entity,
+                    mentionCount: entity._count.mentions,
+                  }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )
       ))}
 
       {/* Empty state */}

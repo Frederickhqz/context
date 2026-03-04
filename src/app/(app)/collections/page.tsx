@@ -18,16 +18,23 @@ interface CollectionWithCount {
 }
 
 export default async function CollectionsPage() {
-  // TODO: Add authentication
-  const collections = await prisma.collection.findMany({
-    take: 50,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      _count: {
-        select: { notes: true },
+  let collections: any[] = [];
+
+  try {
+    // TODO: Add authentication
+    collections = await prisma.collection.findMany({
+      take: 50,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: { notes: true },
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    console.error('Failed to fetch collections:', error);
+    // Return empty state on error
+  }
 
   return (
     <div className="space-y-6">

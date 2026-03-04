@@ -12,6 +12,20 @@ interface SearchResult {
   score: number;
 }
 
+// Local type for entity mention with entity
+interface EntityMentionWithEntity {
+  id: string;
+  noteId: string;
+  entityId: string;
+  context: string | null;
+  entity: {
+    id: string;
+    name: string;
+    entityType: string;
+    aliases: string[];
+  };
+}
+
 // GET /api/search - Search notes
 export async function GET(request: NextRequest) {
   try {
@@ -88,15 +102,21 @@ export async function GET(request: NextRequest) {
 
     // Fetch related entities for each result
     const notesWithEntities = await Promise.all(
-      results.map(async (note) => {
-        const entityMentions = await prisma.entityMention.findMany({
+      results.map(async (note: SearchResult) => {
+        const mentions = await prisma.entityMention.findMany({
           where: { noteId: note.id },
           include: { entity: true },
-        });
-        
+        }) as EntityMentionWithEntity[];
+
+        // Extract entities with explicit typing
+        const entities = [];
+        for (const m of mentions) {
+          entities.push(m.entity);
+        }
+
         return {
           ...note,
-          entities: entityMentions.map(em => em.entity),
+          entities,
         };
       })
     );

@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
           include: { tag: true },
         },
       },
-    });
+    }) as NoteWithRelations[];
 
     // Fetch beats in date range
     const beats = await prisma.beat.findMany({
@@ -99,14 +99,14 @@ export async function GET(request: NextRequest) {
       include: {
         note: true,
       },
-    });
+    }) as BeatWithNote[];
 
     // Group by granularity
     const grouped = groupByGranularity(notes, beats, granularity as 'day' | 'week' | 'month' | 'year');
 
     // Include connections if requested
     if (includeConnections) {
-      const noteIds = notes.map(n => n.id);
+      const noteIds = notes.map((n: NoteWithRelations) => n.id);
       const connections = await prisma.connection.findMany({
         where: {
           OR: [

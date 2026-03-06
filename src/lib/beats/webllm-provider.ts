@@ -253,7 +253,7 @@ Output ONLY valid JSON with this structure:
    * Unload model to free memory
    */
   async unload(): Promise<void> {
-    if (this.engine && typeof this.engine === 'object' && 'unload' in this.engine) {
+    if (this.engine && typeof this.engine === 'object' && this.engine !== null && 'unload' in this.engine) {
       await (this.engine as { unload: () => Promise<void> }).unload();
     }
     this.engine = null;

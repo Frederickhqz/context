@@ -324,6 +324,28 @@ Body:
 }
 ```
 
+### Auto-Detect Connections (suggested)
+
+```http
+POST /api/beats/detect-connections
+```
+
+Body (either `noteId` or `beatIds` required):
+```json
+{
+  "noteId": "note_123",
+  "maxPairs": 30,
+  "minStrength": 0.65,
+  "allowContradictions": true,
+  "preferCheapSimilarity": true,
+  "cheapSimilarityThreshold": 0.72
+}
+```
+
+Notes:
+- When `preferCheapSimilarity=true`, the API will create `RELATES_TO` suggestions using a cheap lexical similarity heuristic (name+summary) before spending LLM calls.
+- If the cheap similarity doesn’t meet threshold, it falls back to LLM-based relationship inference.
+
 ---
 
 ## MCP Integration

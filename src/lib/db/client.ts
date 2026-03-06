@@ -18,13 +18,17 @@ function createPrismaClient() {
     throw new Error('Missing DATABASE_URL (pooler connection string)');
   }
 
-  // Supabase pooler uses TLS; in some serverless runtimes the cert chain validation can fail.
-  // We allow opting into relaxed verification via DB_SSL_NO_VERIFY=true.
-  const sslNoVerify = process.env.DB_SSL_NO_VERIFY === 'true';
+  // Supabase pooler uses TLS; in some serverless runtimes (notably Vercel)
+  // the certificate chain can fail validation ("self-signed certificate in certificate chain").
+  // Default to relaxed verification on Vercel; can be controlled via DB_SSL_NO_VERIFY.
+  const sslNoVerify =
+    process.env.DB_SSL_NO_VERIFY === 'true' ||
+    process.env.VERCEL === '1' ||
+    process.env.VERCEL === 'true';
 
   const pool = new Pool({
     connectionString,
-    ssl: sslNoVerify ? { rejectUnauthorized: false } : undefined,
+    ssl: sslNoVerify ? { rejectUnauthorized: false } : { rejectUnauthorized: true },
   });
 
   const adapter = new PrismaPg(pool);

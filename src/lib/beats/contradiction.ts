@@ -1,8 +1,6 @@
 // Contradiction Detection Engine
 // Finds conflicts and inconsistencies in the beat mesh
 
-import { BeatType } from './types';
-
 // Beat type for contradiction detection (matches Prisma schema)
 interface BeatForDetection {
   id: string;
@@ -121,7 +119,7 @@ export class ContradictionDetector {
             type: 'factual',
             severity: 'high',
             description: `Explicit contradiction between "${beat1.name}" and "${beat2.name}"`,
-            evidence: conn.contradictionNote || conn.evidence,
+            evidence: conn.contradictionNote ?? conn.evidence ?? undefined,
             detectedAt: new Date()
           });
         }
@@ -195,7 +193,7 @@ export class ContradictionDetector {
     const contradictions: Contradiction[] = [];
     
     // Group beats by type
-    const beatsByType = new Map<string, Beat[]>();
+    const beatsByType = new Map<string, BeatForDetection[]>();
     for (const beat of beats) {
       if (!beatsByType.has(beat.beatType)) {
         beatsByType.set(beat.beatType, []);
@@ -247,7 +245,7 @@ export class ContradictionDetector {
     const contradictions: Contradiction[] = [];
     
     // Group connections by beat pairs
-    const connectionsByPair = new Map<string, BeatConnection[]>();
+    const connectionsByPair = new Map<string, ConnectionForDetection[]>();
     
     for (const conn of connections) {
       const key = [conn.fromBeatId, conn.toBeatId].sort().join('-');
@@ -258,7 +256,7 @@ export class ContradictionDetector {
     }
     
     // Find pairs with contradictory connection types
-    const oppositePairs: Array<[BeatConnectionType, BeatConnectionType]> = [
+    const oppositePairs: Array<[string, string]> = [
       ['SUPPORTS', 'UNDERMINES'],
       ['CAUSES', 'CONTRADICTS'],
       ['FORESHADOWS', 'CONTRADICTS'],

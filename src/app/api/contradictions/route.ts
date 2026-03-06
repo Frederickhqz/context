@@ -1,7 +1,7 @@
 // Contradictions API - Find and manage contradictions in the beat mesh
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
-import { getContradictionDetector, Contradiction } from '@/lib/beats/contradiction';
+import { getContradictionDetector, type Contradiction } from '@/lib/beats/contradiction';
 
 // GET /api/contradictions - Find all contradictions
 export async function GET(request: NextRequest) {
@@ -50,7 +50,8 @@ export async function GET(request: NextRequest) {
     
     // Detect contradictions
     const detector = getContradictionDetector();
-    const contradictions = await detector.findContradictions(beats as unknown as Beat[], connections as unknown as BeatConnection[]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const contradictions = await detector.findContradictions(beats as any[], connections as any[]);
     
     // Filter by severity
     let filtered = contradictions;
@@ -128,8 +129,10 @@ export async function POST(request: NextRequest) {
       const detector = getContradictionDetector();
       const contradiction: Contradiction = {
         id: `${beat1.id}-${beat2.id}`,
-        beat1: beat1 as unknown as Beat,
-        beat2: beat2 as unknown as Beat,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        beat1: beat1 as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        beat2: beat2 as any,
         type: 'factual',
         severity: 'medium',
         description: `Potential contradiction between "${beat1.name}" and "${beat2.name}"`,
@@ -139,7 +142,12 @@ export async function POST(request: NextRequest) {
       const suggestion = await detector.suggestResolution(contradiction);
       
       return NextResponse.json({
-        contradiction,
+        contradiction: {
+          id: contradiction.id,
+          type: contradiction.type,
+          severity: contradiction.severity,
+          description: contradiction.description
+        },
         suggestion
       });
     }

@@ -269,7 +269,8 @@ async function handleCreateBeat(args: Record<string, unknown>) {
   const beat = await prisma.beat.create({
     data: {
       userId: 'mcp-user',
-      beatType: args.type as string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      beatType: args.type as any,
       name: args.name as string,
       summary: args.summary as string | undefined,
       intensity: (args.intensity as number) || 0.5,
@@ -383,7 +384,8 @@ async function handleConnectBeats(args: Record<string, unknown>) {
       userId: 'mcp-user',
       fromBeatId: args.fromBeatId as string,
       toBeatId: args.toBeatId as string,
-      connectionType: args.connectionType as string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      connectionType: args.connectionType as any,
       strength: 0.5,
       evidence: args.evidence as string | undefined
     }
@@ -415,10 +417,8 @@ async function handleFindContradictions(args: Record<string, unknown>) {
   });
   
   const detector = getContradictionDetector();
-  const contradictions = await detector.findContradictions(
-    beats as unknown as Array<{ id: string; beatType: string; name: string; valence: number | null; intensity: number }>,
-    connections as unknown as Array<{ id: string; fromBeatId: string; toBeatId: string; connectionType: string; isContradiction: boolean }>
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contradictions = await detector.findContradictions(beats as any[], connections as any[]);
   
   return {
     content: [{

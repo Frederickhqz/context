@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { requireUser } from "@/lib/auth/server";
 
 // GET /api/notes - List notes
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireUser(request);
+
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = parseInt(searchParams.get("offset") || "0");
@@ -17,7 +20,10 @@ export async function GET(request: NextRequest) {
       take: limit,
       skip: offset,
       orderBy: { createdAt: "desc" },
-      where: type ? { noteType: type } : undefined,
+      where: {
+        userId: user.id,
+        ...(type ? { noteType: type } : {}),
+      },
       include: {
         tags: {
           include: { tag: true }
@@ -41,6 +47,7 @@ export async function GET(request: NextRequest) {
 // POST /api/notes - Create note
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireUser(request);
     const body = await request.json();
     const { title, content, noteType = "note", metadata, entityIds = [], collectionIds = [], tagIds = [] } = body;
 
@@ -69,7 +76,7 @@ export async function POST(request: NextRequest) {
     const note = await prisma.note.create({
       data: {
         // TODO: Replace with actual user ID from auth
-        userId: "demo-user",
+        userId: user.id,
         title,
         content,
         contentPlain,

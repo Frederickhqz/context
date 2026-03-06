@@ -1,12 +1,15 @@
 // Beats API - List and Create beats
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { requireUser } from '@/lib/auth/server';
 import { getBeatExtractor } from '@/lib/beats/extractor';
 import { BeatType, BeatSource } from '@/lib/beats/types';
 
 // GET /api/beats - List beats with filters
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireUser(request);
+
     const searchParams = request.nextUrl.searchParams;
     
     // Filters
@@ -26,7 +29,7 @@ export async function GET(request: NextRequest) {
     
     // Build where clause
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {};
+    const where: any = { userId: user.id };
     
     if (type) {
       where.beatType = type;
@@ -110,6 +113,7 @@ export async function GET(request: NextRequest) {
 // POST /api/beats - Create a new beat
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireUser(request);
     const body = await request.json();
     
     // Validate required fields
@@ -123,7 +127,7 @@ export async function POST(request: NextRequest) {
     // Create beat
     const beat = await prisma.beat.create({
       data: {
-        userId: body.userId || 'demo-user', // TODO: Get from auth
+        userId: user.id,
         beatType: body.beatType,
         name: body.name,
         summary: body.summary,
@@ -182,6 +186,7 @@ export async function POST(request: NextRequest) {
 // POST /api/beats/extract - Extract beats from text
 export async function PUT(request: NextRequest) {
   try {
+    const user = await requireUser(request);
     const body = await request.json();
     
     if (!body.text && !body.noteId) {
@@ -195,7 +200,7 @@ export async function PUT(request: NextRequest) {
     let text = body.text;
     if (body.noteId) {
       const note = await prisma.note.findUnique({
-        where: { id: body.noteId },
+        where: { id: body.noteId, userId: user.id },
         select: { contentPlain: true, content: true },
       });
       text = note?.contentPlain || note?.content || '';

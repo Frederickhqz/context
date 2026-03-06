@@ -21,16 +21,23 @@ export function getBearerToken(req: NextRequest): string | null {
  * Require a valid Supabase Auth user (server-side).
  * Throws on missing/invalid auth.
  */
+export class AuthError extends Error {
+  constructor(message = 'Unauthorized') {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
 export async function requireUser(req: NextRequest): Promise<AuthUser> {
   const token = getBearerToken(req);
   if (!token) {
-    throw new Error('Unauthorized');
+    throw new AuthError('Unauthorized');
   }
 
   const serverClient = createServerClient();
   const { data, error } = await serverClient.auth.getUser(token);
   if (error || !data.user) {
-    throw new Error('Unauthorized');
+    throw new AuthError('Unauthorized');
   }
 
   return {

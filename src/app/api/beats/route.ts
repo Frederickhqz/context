@@ -1,7 +1,7 @@
 // Beats API - List and Create beats
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
-import { requireUser } from '@/lib/auth/server';
+import { requireUser, AuthError } from '@/lib/auth/server';
 import { getBeatExtractor } from '@/lib/beats/extractor';
 import { BeatType, BeatSource } from '@/lib/beats/types';
 
@@ -102,6 +102,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('Error listing beats:', error);
     return NextResponse.json(
       { error: 'Failed to list beats' },
@@ -175,6 +178,9 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ beat }, { status: 201 });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('Error creating beat:', error);
     return NextResponse.json(
       { error: 'Failed to create beat' },
@@ -218,6 +224,9 @@ export async function PUT(request: NextRequest) {
       sourceText: text?.substring(0, 500) + (text && text.length > 500 ? '...' : ''),
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('Error extracting beats:', error);
     return NextResponse.json(
       { error: 'Failed to extract beats' },

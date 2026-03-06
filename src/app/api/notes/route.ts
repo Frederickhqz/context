@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
-import { requireUser } from "@/lib/auth/server";
+import { requireUser, AuthError } from "@/lib/auth/server";
 
 // GET /api/notes - List notes
 export async function GET(request: NextRequest) {
@@ -36,6 +36,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ notes });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error("Error fetching notes:", error);
     return NextResponse.json(
       { error: "Failed to fetch notes" },
@@ -117,6 +120,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ note }, { status: 201 });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error("Error creating note:", error);
     return NextResponse.json(
       { error: "Failed to create note" },

@@ -1,6 +1,7 @@
 // Similar Beats API - Find similar beats by ID
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { cheapSimilarity } from '@/lib/connections/detector';
 
 // GET /api/beats/similar/[id] - Find similar beats
 export async function GET(
@@ -78,23 +79,24 @@ export async function GET(
     // Calculate similarity scores
     const scoredBeats = similarBeats.map(beat => {
       let score = 0;
-      
+
       // Same type bonus
       if (beat.beatType === sourceBeat.beatType) {
         score += 0.3;
       }
-      
-      // Name similarity
-      const nameWords = sourceBeat.name.toLowerCase().split(' ');
-      const beatWords = beat.name.toLowerCase().split(' ');
-      const sharedWords = nameWords.filter(w => beatWords.includes(w)).length;
-      score += Math.min(sharedWords / Math.max(nameWords.length, 1), 0.3);
-      
+
+      // Cheap lexical similarity (name + summary)
+      const lexical = cheapSimilarity(
+        { id: sourceBeat.id, beatType: sourceBeat.beatType, name: sourceBeat.name, summary: sourceBeat.summary },
+        { id: beat.id, beatType: beat.beatType, name: beat.name, summary: beat.summary }
+      );
+      score += Math.min(lexical * 0.6, 0.4);
+
       // Shared notes
       const sourceNoteIds = new Set(sourceBeat.noteBeats.map(nb => nb.noteId));
       const sharedNotes = beat.noteBeats.filter(nb => sourceNoteIds.has(nb.noteId)).length;
-      score += Math.min(sharedNotes * 0.1, 0.4);
-      
+      score += Math.min(sharedNotes * 0.1, 0.3);
+
       return {
         beat: {
           id: beat.id,

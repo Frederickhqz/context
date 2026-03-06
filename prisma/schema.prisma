@@ -9,31 +9,50 @@ datasource db {
   provider = "postgresql"
 }
 
-// Notes (core entity)
+// ═══════════════════════════════════════════════════════════════
+// NOTES - Core entity (updated with analysis support)
+// ═══════════════════════════════════════════════════════════════
+
 model Note {
-  id           String                  @id @default(cuid())
-  userId       String                  @map("user_id")
-  title        String?
-  content      String
-  contentPlain String?                 @map("content_plain")
-  embedding    Unsupported("vector(768)")?
-  noteType     String                  @default("note") @map("note_type")
-  createdAt    DateTime                @default(now()) @map("created_at")
-  updatedAt   DateTime                @updatedAt @map("updated_at")
-  metadata     Json?
+  id            String                  @id @default(cuid())
+  userId        String                  @map("user_id")
+  title         String?
+  content       String                  @db.Text
+  contentPlain  String?                 @map("content_plain") @db.Text
+  embedding     Unsupported("vector(768)")?
+  noteType      String                  @default("note") @map("note_type")
+  
+  // Analysis status
+  analysisStatus AnalysisStatus          @default(PENDING) @map("analysis_status")
+  analyzedAt    DateTime?                @map("analyzed_at")
+  analysisError String?                 @map("analysis_error") @db.Text
+  
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  metadata      Json?
 
   // Relations
-  connectionsFrom Connection[]         @relation("ConnectionFrom")
-  connectionsTo   Connection[]         @relation("ConnectionTo")
+  connectionsFrom Connection[]           @relation("ConnectionFrom")
+  connectionsTo   Connection[]           @relation("ConnectionTo")
   entityMentions  EntityMention[]
-  beats           Beat[]
+  noteBeats       NoteBeat[]              // Updated: junction with Beats
   collections     CollectionNote[]
   tags            NoteTag[]
 
   @@map("notes")
 }
 
-// Connections (links between notes)
+enum AnalysisStatus {
+  PENDING     // Needs analysis
+  PROCESSING  // Currently analyzing
+  COMPLETED   // Analysis done
+  FAILED      // Analysis failed
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONNECTIONS - Legacy note-to-note connections
+// ═══════════════════════════════════════════════════════════════
+
 model Connection {
   id             String   @id @default(cuid())
   userId         String   @map("user_id")
@@ -43,7 +62,6 @@ model Connection {
   strength       Float    @default(1.0)
   createdAt      DateTime @default(now()) @map("created_at")
 
-  // Relations
   fromNote Note @relation("ConnectionFrom", fields: [fromNoteId], references: [id], onDelete: Cascade)
   toNote   Note @relation("ConnectionTo", fields: [toNoteId], references: [id], onDelete: Cascade)
 
@@ -51,7 +69,10 @@ model Connection {
   @@map("connections")
 }
 
-// Entities (people, places, projects)
+// ═══════════════════════════════════════════════════════════════
+// ENTITIES - Named entities (people, places, etc.)
+// ═══════════════════════════════════════════════════════════════
+
 model Entity {
   id         String        @id @default(cuid())
   userId     String        @map("user_id")
@@ -61,22 +82,19 @@ model Entity {
   metadata   Json?
   createdAt  DateTime      @default(now()) @map("created_at")
 
-  // Relations
   mentions EntityMention[]
 
   @@map("entities")
 }
 
-// Entity Mentions (junction table)
 model EntityMention {
-  id        String   @id @default(cuid())
-  entityId  String   @map("entity_id")
-  noteId    String   @map("note_id")
-  context   String?
-  confidence Float   @default(1.0)
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String   @id @default(cuid())
+  entityId   String   @map("entity_id")
+  noteId     String   @map("note_id")
+  context    String?
+  confidence Float    @default(1.0)
+  createdAt  DateTime @default(now()) @map("created_at")
 
-  // Relations
   entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
   note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
 
@@ -84,24 +102,378 @@ model EntityMention {
   @@map("entity_mentions")
 }
 
-// Beats (time-bound notes)
+// ═══════════════════════════════════════════════════════════════
+// BEATS - Atomic units of meaning (THE NEW CORE)
+// ═══════════════════════════════════════════════════════════════
+
 model Beat {
-  id        String    @id @default(cuid())
-  userId    String    @map("user_id")
-  noteId    String    @map("note_id")
-  beatType  String    @map("beat_type")
-  startedAt DateTime? @map("started_at")
-  endedAt   DateTime? @map("ended_at")
-  intensity Int       @default(3)
-  createdAt DateTime  @default(now()) @map("created_at")
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  
+  // What kind of beat
+  beatType    BeatType    @map("beat_type")
+  
+  // Core identity
+  name        String
+  summary     String?     @db.Text
+  content     String?     @db.Text
+  
+  // Variations
+  aliases     String[]
+  
+  // Semantic embedding (for similarity)
+  embedding   Unsupported("vector(768)")?
+  
+  // Rich metadata
+  metadata    Json?
+  
+  // Emotional/thematic weight
+  intensity   Float       @default(0.5)
+  valence     Float?       // -1 to 1 (negative to positive)
+  
+  // Source tracking
+  source      BeatSource  @default(AUTO) @map("source")
+  confidence  Float       @default(1.0)
+  
+  // Temporal anchors
+  timelineId  String?     @map("timeline_id")
+  startTime   String?     @map("start_time")  // "Chapter 3", "2024-03-05", "Age 7"
+  endTime     String?     @map("end_time")
+  
+  // World/dimension
+  worldId     String?     @map("world_id")
+  dimensionId String?     @map("dimension_id")
+  
+  // Count
+  frequency   Int         @default(1)  // How many notes mention this
+  
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  timeline        Timeline?             @relation(fields: [timelineId], references: [id])
+  world           World?                @relation(fields: [worldId], references: [id])
+  dimension       Dimension?            @relation(fields: [dimensionId], references: [id])
+  noteBeats       NoteBeat[]
+  connections     BeatConnection[]      @relation("FromBeat")
+  reverseConnections BeatConnection[]   @relation("ToBeat")
+  storylines      StorylineBeat[]
+  scenes          SceneBeat[]
+  characters      CharacterBeat[]
 
-  @@map("beats")
+  @@index([userId, beatType])
+  @@index([userId, name])
+  @@map("beats_new")
 }
 
-// Collections (grouping notes)
+enum BeatType {
+  // Narrative
+  STORY         // Main story arc
+  SCENE         // A scene/moment
+  CHAPTER       // Chapter marker
+  
+  // Entities
+  CHARACTER     // Person/being
+  PLACE         // Location
+  OBJECT        // Significant item
+  CREATURE      // Non-character being
+  
+  // Concepts
+  THEME         // Recurring theme
+  MOTIF         // Recurring symbol/pattern
+  IDEA          // Abstract concept
+  QUESTION      // Unresolved mystery
+  INSIGHT       // Key realization
+  
+  // Dynamics
+  RELATIONSHIP  // Dynamic between entities
+  CONFLICT      // Tension/opposition
+  RESOLUTION    // Resolution point
+  
+  // Meta
+  WORLD         // World/universe
+  DIMENSION     // Parallel dimension/timeline
+  TIMELINE      // Temporal sequence
+  
+  // Emotional
+  FEELING       // Emotional beat
+  MOOD          // Atmospheric quality
+  
+  // Custom
+  CUSTOM        // User-defined type
+}
+
+enum BeatSource {
+  AUTO      // AI-extracted
+  MANUAL    // User-created
+  HYBRID    // AI-suggested, user-refined
+  IMPORTED  // From batch import
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BEAT CONNECTIONS - The multidimensional mesh
+// ═══════════════════════════════════════════════════════════════
+
+model BeatConnection {
+  id              String              @id @default(cuid())
+  userId          String              @map("user_id")
+  
+  fromBeatId      String              @map("from_beat_id")
+  toBeatId        String              @map("to_beat_id")
+  
+  // How they connect
+  connectionType  BeatConnectionType  @map("connection_type")
+  strength        Float               @default(0.5)
+  
+  // The "why"
+  description     String?             @db.Text
+  evidence        String?             @db.Text
+  
+  // Conflict detection
+  isContradiction Boolean             @default(false) @map("is_contradiction")
+  contradictionNote String?           @map("contradiction_note") @db.Text
+  
+  // Suggestion metadata
+  isSuggested     Boolean             @default(false) @map("is_suggested")
+  suggestedBy     String?             @map("suggested_by")
+  
+  // Temporal context
+  contextTime     String?             @map("context_time")
+  
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  fromBeat        Beat                @relation("FromBeat", fields: [fromBeatId], references: [id], onDelete: Cascade)
+  toBeat          Beat                @relation("ToBeat", fields: [toBeatId], references: [id], onDelete: Cascade)
+
+  @@unique([fromBeatId, toBeatId, connectionType])
+  @@map("beat_connections")
+}
+
+enum BeatConnectionType {
+  // Relational
+  RELATES_TO     // General connection
+  PART_OF        // Hierarchy
+  CONTAINS       // Inverse hierarchy
+  REFERENCES     // Explicit reference
+  
+  // Narrative
+  CAUSES         // Causal chain
+  RESULTS_FROM   // Inverse causal
+  FORESHADOWS    // Narrative setup
+  MIRRORS        // Parallel/echo
+  CONTRADICTS    // Conflict/tension
+  RESOLVES       // Resolution
+  
+  // Temporal
+  PRECEDES       // Time order
+  FOLLOWS        // Inverse time order
+  CONCURRENT     // Same time
+  
+  // Transformative
+  EVOLVES_TO     // Transformation
+  EVOLVES_FROM   // Inverse transformation
+  REPLACES       // Supersedes
+  
+  // Dimensional
+  ALTERNATE_OF   // Alternate timeline/version
+  PARALLEL_TO    // Parallel dimension
+  
+  // Emotional
+  SUPPORTS       // Reinforces
+  UNDERMINES     // Weakens
+  TENSIONS_WITH  // Creates tension
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NOTE-BEAT JUNCTION
+// ═══════════════════════════════════════════════════════════════
+
+model NoteBeat {
+  noteId      String    @map("note_id")
+  beatId      String    @map("beat_id")
+  relevance   Float     @default(0.5)
+  mentions    Int       @default(1)
+  context     String?   @db.Text
+  
+  note        Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  beat        Beat      @relation(fields: [beatId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, beatId])
+  @@map("note_beats")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTAINERS - Stories, Worlds, Dimensions
+// ═══════════════════════════════════════════════════════════════
+
+model Storyline {
+  id          String          @id @default(cuid())
+  userId      String          @map("user_id")
+  
+  name        String
+  description String?         @db.Text
+  color       String?
+  
+  // Hierarchy
+  parentId    String?         @map("parent_id")
+  parent      Storyline?      @relation("StorylineHierarchy", fields: [parentId], references: [id])
+  children    Storyline[]     @relation("StorylineHierarchy")
+  
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  beats       StorylineBeat[]
+
+  @@map("storylines")
+}
+
+model World {
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  
+  name        String
+  description String?     @db.Text
+  
+  // World rules/logic
+  rules       Json?
+  
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  beats       Beat[]
+  dimensions  Dimension[]
+  timelines   Timeline[]
+
+  @@map("worlds")
+}
+
+model Dimension {
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  worldId     String?     @map("world_id")
+  
+  name        String
+  description String?     @db.Text
+  
+  // What makes this dimension different
+  divergence  String?     @db.Text
+  differences Json?
+  
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  world       World?      @relation(fields: [worldId], references: [id])
+  beats       Beat[]
+
+  @@map("dimensions")
+}
+
+model Timeline {
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  worldId     String?     @map("world_id")
+  
+  name        String
+  description String?     @db.Text
+  
+  // Scale
+  scale       String?     @default("narrative")
+  
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  world       World?      @relation(fields: [worldId], references: [id])
+  beats       Beat[]
+
+  @@map("timelines")
+}
+
+model Scene {
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  
+  name        String
+  description String?     @db.Text
+  
+  // Scene-specific
+  setting     String?
+  mood        String?
+  
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  beats       SceneBeat[]
+
+  @@map("scenes")
+}
+
+model Character {
+  id          String          @id @default(cuid())
+  userId      String          @map("user_id")
+  
+  name        String
+  aliases     String[]
+  description String?         @db.Text
+  
+  // Character-specific
+  role        String?
+  arc         String?         @db.Text
+  
+  // Visual
+  avatar      String?
+  
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  beats       CharacterBeat[]
+
+  @@map("characters")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// JUNCTION TABLES
+// ═══════════════════════════════════════════════════════════════
+
+model StorylineBeat {
+  storylineId String      @map("storyline_id")
+  beatId      String      @map("beat_id")
+  order       Int         @default(0)
+  
+  storyline   Storyline   @relation(fields: [storylineId], references: [id], onDelete: Cascade)
+  beat        Beat        @relation(fields: [beatId], references: [id], onDelete: Cascade)
+
+  @@id([storylineId, beatId])
+  @@map("storyline_beats")
+}
+
+model SceneBeat {
+  sceneId     String      @map("scene_id")
+  beatId      String      @map("beat_id")
+  order       Int         @default(0)
+  
+  scene       Scene       @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  beat        Beat        @relation(fields: [beatId], references: [id], onDelete: Cascade)
+
+  @@id([sceneId, beatId])
+  @@map("scene_beats")
+}
+
+model CharacterBeat {
+  characterId String      @map("character_id")
+  beatId      String      @map("beat_id")
+  role        String?
+  
+  character   Character   @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  beat        Beat        @relation(fields: [beatId], references: [id], onDelete: Cascade)
+
+  @@id([characterId, beatId])
+  @@map("character_beats")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COLLECTIONS & TAGS (existing)
+// ═══════════════════════════════════════════════════════════════
+
 model Collection {
   id          String   @id @default(cuid())
   userId      String   @map("user_id")
@@ -111,19 +483,16 @@ model Collection {
   icon        String?
   createdAt   DateTime @default(now()) @map("created_at")
 
-  // Relations
   notes CollectionNote[]
 
   @@map("collections")
 }
 
-// Collection Notes (junction)
 model CollectionNote {
   collectionId String   @map("collection_id")
   noteId       String   @map("note_id")
   addedAt      DateTime @default(now()) @map("added_at")
 
-  // Relations
   collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   note       Note       @relation(fields: [noteId], references: [id], onDelete: Cascade)
 
@@ -131,7 +500,6 @@ model CollectionNote {
   @@map("collection_notes")
 }
 
-// Tags
 model Tag {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
@@ -139,22 +507,57 @@ model Tag {
   color     String   @default("#6B7280")
   createdAt DateTime @default(now()) @map("created_at")
 
-  // Relations
   notes NoteTag[]
 
   @@unique([userId, name])
   @@map("tags")
 }
 
-// Note Tags (junction)
 model NoteTag {
   noteId String @map("note_id")
   tagId  String @map("tag_id")
 
-  // Relations
   note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
   tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([noteId, tagId])
   @@map("note_tags")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORTS - Batch import tracking
+// ═══════════════════════════════════════════════════════════════
+
+model Import {
+  id              String        @id @default(cuid())
+  userId          String        @map("user_id")
+  
+  filename        String
+  fileSize        Int           @map("file_size")
+  status          ImportStatus
+  
+  // Processing
+  totalChunks     Int           @default(0) @map("total_chunks")
+  processedChunks Int           @default(0) @map("processed_chunks")
+  
+  // Results
+  notesCreated    Int           @default(0) @map("notes_created")
+  beatsExtracted  Int           @default(0) @map("beats_extracted")
+  connectionsFound Int          @default(0) @map("connections_found")
+  
+  // Error tracking
+  errors          Json?
+  
+  createdAt       DateTime      @default(now()) @map("created_at")
+  completedAt     DateTime?     @map("completed_at")
+
+  @@map("imports")
+}
+
+enum ImportStatus {
+  UPLOADING
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
 }

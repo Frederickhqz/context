@@ -9,6 +9,8 @@ import { Icon } from '@/components/ui/Icon';
 export const dynamic = 'force-dynamic';
 
 // Local type definitions (avoid Prisma client dependency during build)
+type BeatType = 'PERSON' | 'PLACE' | 'THING' | 'EVENT' | 'CONCEPT' | 'THEME' | 'QUESTION' | 'INSIGHT' | 'DECISION' | 'GOAL' | 'BELIEF' | 'FEELING' | 'MEMORY' | 'DREAM' | 'QUICK_NOTE';
+
 interface NoteSelect {
   id: string;
   title: string | null;
@@ -19,7 +21,7 @@ interface BeatSelect {
   id: string;
   beatType: string;
   createdAt: Date;
-  startedAt: Date | null;
+  startTime: string | null;
 }
 
 interface ConnectionWithNotes {
@@ -79,7 +81,6 @@ export default async function VisualizePage() {
         id: true,
         beatType: true,
         createdAt: true,
-        startedAt: true,
       },
     });
 
@@ -94,15 +95,15 @@ export default async function VisualizePage() {
 
     // Prepare calendar events
     calendarEvents = [
-      ...notes.map((n: NoteSelect) => ({
+      ...notes.map((n) => ({
         id: n.id,
         date: n.createdAt,
         type: 'note' as const,
         title: n.title || undefined,
       })),
-      ...beats.map((b: BeatSelect) => ({
+      ...beats.map((b) => ({
         id: b.id,
-        date: b.startedAt || b.createdAt,
+        date: b.createdAt,
         type: 'beat' as const,
         title: b.beatType,
       })),
@@ -110,14 +111,14 @@ export default async function VisualizePage() {
 
     // Prepare graph nodes
     const noteIds = new Set<string>();
-    connections.forEach((c: ConnectionWithNotes) => {
+    connections.forEach((c) => {
       noteIds.add(c.fromNoteId);
       noteIds.add(c.toNoteId);
     });
 
-    graphNodes = Array.from(noteIds).map((id: string) => {
-      const note = connections.find((c: ConnectionWithNotes) => c.fromNoteId === id)?.fromNote ||
-        connections.find((c: ConnectionWithNotes) => c.toNoteId === id)?.toNote;
+    graphNodes = Array.from(noteIds).map((id) => {
+      const note = connections.find((c) => c.fromNoteId === id)?.fromNote ||
+        connections.find((c) => c.toNoteId === id)?.toNote;
       return {
         id,
         label: note?.title || `Note ${id.slice(0, 4)}`,
@@ -125,7 +126,7 @@ export default async function VisualizePage() {
       };
     });
 
-    graphLinks = connections.map((c: ConnectionWithNotes) => ({
+    graphLinks = connections.map((c) => ({
       source: c.fromNoteId,
       target: c.toNoteId,
       type: c.connectionType as 'reference' | 'semantic' | 'temporal',
@@ -134,7 +135,7 @@ export default async function VisualizePage() {
 
     // Build tree from first connection if available
     treeData = connections.length > 0
-      ? buildTreeFromConnections(connections[0].fromNoteId, connections as ConnectionWithNotes[])
+      ? buildTreeFromConnections(connections[0].fromNoteId, connections)
       : null;
   } catch (error) {
     console.error('Failed to fetch visualize data:', error);

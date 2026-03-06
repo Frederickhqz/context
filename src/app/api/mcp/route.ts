@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { embed } from "@/lib/embeddings";
+import { BeatType } from "@prisma/client";
 
 // Types for MCP responses
 interface SemanticResult {
@@ -49,9 +50,8 @@ interface BeatWithNote {
   id: string;
   beatType: string;
   intensity: number;
-  startedAt: Date | null;
   createdAt: Date;
-  note: { id: string; title: string | null } | null;
+  noteBeats: { note: { id: string; title: string | null } }[];
 }
 
 interface EntityInfo {
@@ -710,13 +710,17 @@ async function handleGetTimeline(args: Record<string, unknown>) {
 
   const beats = await prisma.beat.findMany({
     where: {
-      startedAt: {
+      createdAt: {
         gte: startDate,
         lte: endDate,
       },
     },
-    orderBy: { startedAt: 'asc' },
-    include: { note: { select: { id: true, title: true } } },
+    orderBy: { createdAt: 'asc' },
+    include: { 
+      noteBeats: { 
+        include: { note: { select: { id: true, title: true } } } 
+      } 
+    },
     take: 50,
   }) as BeatWithNote[];
 
@@ -735,13 +739,13 @@ async function handleGetTimeline(args: Record<string, unknown>) {
   }
 
   for (const beat of beats) {
-    const key = getDateKey(beat.startedAt || beat.createdAt, granularity as 'day' | 'week' | 'month' | 'year');
+    const key = getDateKey(beat.createdAt, granularity as 'day' | 'week' | 'month' | 'year');
     if (!grouped[key]) grouped[key] = { date: key, notes: [], beats: [] };
     grouped[key].beats.push({
       id: beat.id,
       type: beat.beatType,
       intensity: beat.intensity,
-      note: beat.note ? { id: beat.note.id, title: beat.note.title } : null,
+      note: beat.noteBeats?.[0]?.note ? { id: beat.noteBeats[0].note.id, title: beat.noteBeats[0].note.title } : null,
     });
   }
 
@@ -898,12 +902,13 @@ async function handleGetEntities(args: Record<string, unknown>) {
 }
 
 async function handleCreateBeat(args: Record<string, unknown>) {
-  const { noteId, beatType, intensity = 1, startedAt, endedAt } = args as {
+  const { noteId, beatType, intensity = 1, startTime, endTime, timelineId } = args as {
     noteId?: string;
     beatType: string;
     intensity?: number;
-    startedAt?: string;
-    endedAt?: string;
+    startTime?: string;
+    endTime?: string;
+    timelineId?: string;
   };
 
   if (!noteId) {
@@ -921,11 +926,12 @@ async function handleCreateBeat(args: Record<string, unknown>) {
   const beat = await prisma.beat.create({
     data: {
       userId: "demo-user",
-      noteId,
-      beatType,
+      beatType: beatType as BeatType,
+      name: beatType, // Use beatType as name
       intensity,
-      startedAt: startedAt ? new Date(startedAt) : null,
-      endedAt: endedAt ? new Date(endedAt) : null,
+      startTime,
+      endTime,
+      timelineId,
     },
   });
 
@@ -938,8 +944,8 @@ async function handleCreateBeat(args: Record<string, unknown>) {
           id: beat.id,
           type: beat.beatType,
           intensity: beat.intensity,
-          startedAt: beat.startedAt,
-          endedAt: beat.endedAt,
+          startTime: beat.startTime,
+          endTime: beat.endTime,
         },
       }, null, 2)
     }]

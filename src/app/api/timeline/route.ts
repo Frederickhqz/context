@@ -12,10 +12,8 @@ interface NoteWithRelations {
   entityMentions: Array<{
     entity: { id: string; name: string; entityType: string };
   }>;
-  beats: Array<{
-    id: string;
-    beatType: string;
-    intensity: number;
+  noteBeats: Array<{
+    beat: { id: string; beatType: string; intensity: number };
   }>;
   tags: Array<{
     tag: { id: string; name: string; color: string };
@@ -26,10 +24,10 @@ interface BeatWithNote {
   id: string;
   beatType: string;
   intensity: number;
-  startedAt: Date | null;
-  endedAt: Date | null;
+  startTime: string | null;
+  endTime: string | null;
   createdAt: Date;
-  note: { id: string; title: string | null } | null;
+  noteBeats: { note: { id: string; title: string | null } }[];
 }
 
 interface TimelineGroup {
@@ -45,8 +43,9 @@ interface TimelineGroup {
     id: string;
     type: string;
     intensity: number;
-    startedAt: Date | null;
-    endedAt: Date | null;
+    startTime: string | null;
+    endTime: string | null;
+    createdAt: Date;
     note: { id: string; title: string | null } | null;
   }>;
   entities: Array<{ id: string; name: string; entityType: string }>;
@@ -80,7 +79,9 @@ export async function GET(request: NextRequest) {
         entityMentions: {
           include: { entity: true },
         },
-        beats: true,
+        noteBeats: {
+          include: { beat: true },
+        },
         tags: {
           include: { tag: true },
         },
@@ -90,14 +91,22 @@ export async function GET(request: NextRequest) {
     // Fetch beats in date range
     const beats = await prisma.beat.findMany({
       where: {
-        startedAt: {
+        createdAt: {
           gte: startDate,
           lte: endDate,
         },
       },
-      orderBy: { startedAt: 'asc' },
-      include: {
-        note: true,
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        beatType: true,
+        intensity: true,
+        startTime: true,
+        endTime: true,
+        createdAt: true,
+        noteBeats: {
+          include: { note: { select: { id: true, title: true } } }
+        },
       },
     }) as BeatWithNote[];
 
@@ -183,7 +192,7 @@ function groupByGranularity(
 
   // Add beats to groups
   for (const beat of beats) {
-    const key = getDateKey(beat.startedAt || beat.createdAt, granularity);
+    const key = getDateKey(beat.createdAt, granularity);
     
     if (!groups[key]) {
       groups[key] = {
@@ -198,9 +207,10 @@ function groupByGranularity(
       id: beat.id,
       type: beat.beatType,
       intensity: beat.intensity,
-      startedAt: beat.startedAt,
-      endedAt: beat.endedAt,
-      note: beat.note ? { id: beat.note.id, title: beat.note.title } : null,
+      startTime: beat.startTime,
+      endTime: beat.endTime,
+      createdAt: beat.createdAt,
+      note: beat.noteBeats?.[0]?.note ? { id: beat.noteBeats[0].note.id, title: beat.noteBeats[0].note.title } : null,
     });
   }
 

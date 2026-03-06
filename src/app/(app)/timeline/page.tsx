@@ -27,13 +27,13 @@ export default async function TimelinePage() {
 
     const beats = await prisma.beat.findMany({
       where: {
-        startedAt: {
+        createdAt: {
           gte: start,
           lte: end,
         },
       },
-      orderBy: { startedAt: 'asc' },
-      include: { note: true },
+      orderBy: { createdAt: 'asc' },
+      include: { noteBeats: { include: { note: true } } },
     });
 
     // Group by date
@@ -89,7 +89,7 @@ function groupByDate(notes: any[], beats: any[]) {
   }
 
   for (const beat of beats) {
-    const key = (beat.startedAt || beat.createdAt).toISOString().split('T')[0];
+    const key = beat.createdAt.toISOString().split('T')[0];
     if (!groups[key]) {
       groups[key] = {
         date: key,

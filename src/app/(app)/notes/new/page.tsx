@@ -51,6 +51,26 @@ export default function NewNotePage() {
           throw new Error("Failed to save note");
         }
 
+        const result = await response.json();
+        const noteId = result?.note?.id as string | undefined;
+
+        // Kick off beats + connections automatically on save (no dedicated button)
+        if (noteId) {
+          // 1) Extract beats
+          await fetch(`/api/notes/${noteId}/analyze`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+          });
+
+          // 2) Infer connections between extracted beats
+          await fetch(`/api/beats/detect-connections`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ noteId, maxPairs: 30, minStrength: 0.65 })
+          });
+        }
+
         router.push("/notes");
       }
     } catch (err) {

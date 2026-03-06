@@ -47,6 +47,82 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// PATCH /api/notes - Update note (legacy client path)
+export async function PATCH(request: NextRequest) {
+  try {
+    const user = await requireUser(request);
+    const body = await request.json();
+    const { id, title, content, noteType, metadata } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    // Build update object
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = {};
+
+    if (typeof title !== 'undefined') data.title = title;
+    if (typeof noteType !== 'undefined') data.noteType = noteType;
+    if (typeof metadata !== 'undefined') data.metadata = metadata;
+
+    if (typeof content !== 'undefined') {
+      const contentPlain = String(content || '')
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/`/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/\n+/g, ' ')
+        .trim()
+        .slice(0, 500);
+
+      data.content = content;
+      data.contentPlain = contentPlain;
+      data.analysisStatus = 'PENDING';
+      data.analysisError = null;
+    }
+
+    const note = await prisma.note.update({
+      where: { id, userId: user.id },
+      data,
+    });
+
+    return NextResponse.json({ note });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    console.error('Error updating note:', error);
+    return NextResponse.json({ error: 'Failed to update note' }, { status: 500 });
+  }
+}
+
+// DELETE /api/notes - Delete note (legacy client path: /api/notes?id=...)
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await requireUser(request);
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    await prisma.note.delete({
+      where: { id, userId: user.id },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    console.error('Error deleting note:', error);
+    return NextResponse.json({ error: 'Failed to delete note' }, { status: 500 });
+  }
+}
+
 // POST /api/notes - Create note
 export async function POST(request: NextRequest) {
   try {

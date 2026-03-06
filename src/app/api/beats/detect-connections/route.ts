@@ -1,12 +1,14 @@
 // Auto Relationship Detection API - Infer connections between beats
 // POST /api/beats/detect-connections
 //
-// Uses BeatExtractor.analyzeConnection (LLM) over a limited set of candidate beat pairs.
+// Uses a hybrid strategy:
+// - Cheap lexical similarity for easy RELATES_TO suggestions (no LLM call)
+// - LLM-based inference for richer relationship types
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { getBeatExtractor } from '@/lib/beats/extractor';
-import type { BeatConnectionType, BeatType } from '@/lib/beats/types';
+import { detectAndCreateConnections } from '@/lib/connections/detector';
 
 interface DetectConnectionsBody {
   userId?: string;
@@ -15,8 +17,12 @@ interface DetectConnectionsBody {
   // Safety limits
   maxPairs?: number; // default 30
   minStrength?: number; // default 0.65
-  // If true, allow creating CONTRADICTS connections (still marked isContradiction=false unless model says otherwise)
+  // If true, allow creating CONTRADICTS connections
   allowContradictions?: boolean; // default true
+  // If true, try cheap similarity first before LLM calls
+  preferCheapSimilarity?: boolean; // default true
+  // Threshold for cheap similarity shortcut
+  cheapSimilarityThreshold?: number; // default 0.72
 }
 
 function uniq<T>(arr: T[]): T[] {
@@ -31,6 +37,8 @@ export async function POST(request: NextRequest) {
     const maxPairs = Math.min(Math.max(body.maxPairs ?? 30, 1), 200);
     const minStrength = Math.min(Math.max(body.minStrength ?? 0.65, 0), 1);
     const allowContradictions = body.allowContradictions ?? true;
+    const preferCheapSimilarity = body.preferCheapSimilarity ?? true;
+    const cheapSimilarityThreshold = Math.min(Math.max(body.cheapSimilarityThreshold ?? 0.72, 0), 1);
 
     if (!body.noteId && (!body.beatIds || body.beatIds.length < 2)) {
       return NextResponse.json(
@@ -88,86 +96,67 @@ export async function POST(request: NextRequest) {
 
     const extractor = getBeatExtractor();
 
-    // 3) Analyze each pair and create connections
-    const created: Array<{ fromBeatId: string; toBeatId: string; connectionType: BeatConnectionType; strength: number }> = [];
-    const skipped: Array<{ reason: string; fromBeatId: string; toBeatId: string }> = [];
-
-    for (const [a, b] of pairs) {
-      // Skip if a->b already has any connection (any type) to reduce duplicates.
-      const existing = await prisma.beatConnection.findFirst({
-        where: {
-          userId,
-          OR: [
-            { fromBeatId: a.id, toBeatId: b.id },
-            { fromBeatId: b.id, toBeatId: a.id }
-          ]
+    const { pairsConsidered, created, skipped } = await detectAndCreateConnections({
+      userId,
+      beats,
+      params: {
+        maxPairs,
+        minStrength,
+        allowContradictions,
+        preferCheapSimilarity,
+        cheapSimilarityThreshold
+      },
+      deps: {
+        analyzeConnection: (a, b) => extractor.analyzeConnection(a, b),
+        hasExistingConnection: async (aId, bId) => {
+          const existing = await prisma.beatConnection.findFirst({
+            where: {
+              userId,
+              OR: [
+                { fromBeatId: aId, toBeatId: bId },
+                { fromBeatId: bId, toBeatId: aId }
+              ]
+            },
+            select: { id: true }
+          });
+          return Boolean(existing);
         },
-        select: { id: true }
-      });
-
-      if (existing) {
-        skipped.push({ reason: 'existing_connection', fromBeatId: a.id, toBeatId: b.id });
-        continue;
+        createConnection: async (conn) => {
+          const created = await prisma.beatConnection.create({
+            data: {
+              userId,
+              fromBeatId: conn.fromBeatId,
+              toBeatId: conn.toBeatId,
+              connectionType: conn.connectionType,
+              strength: conn.strength,
+              isContradiction: conn.isContradiction,
+              evidence: conn.evidence,
+              isSuggested: true,
+              suggestedBy: 'auto-relationship-detector'
+            },
+            select: {
+              fromBeatId: true,
+              toBeatId: true,
+              connectionType: true,
+              strength: true
+            }
+          });
+          return created;
+        }
       }
-
-      const analysis = await extractor.analyzeConnection(
-        { type: a.beatType as BeatType, name: a.name, summary: a.summary ?? undefined },
-        { type: b.beatType as BeatType, name: b.name, summary: b.summary ?? undefined }
-      );
-
-      if (!analysis) {
-        skipped.push({ reason: 'analysis_failed', fromBeatId: a.id, toBeatId: b.id });
-        continue;
-      }
-
-      if (!allowContradictions && analysis.connectionType === 'CONTRADICTS') {
-        skipped.push({ reason: 'contradictions_disabled', fromBeatId: a.id, toBeatId: b.id });
-        continue;
-      }
-
-      if (analysis.strength < minStrength) {
-        skipped.push({ reason: 'below_threshold', fromBeatId: a.id, toBeatId: b.id });
-        continue;
-      }
-
-      try {
-        const conn = await prisma.beatConnection.create({
-          data: {
-            userId,
-            fromBeatId: a.id,
-            toBeatId: b.id,
-            connectionType: analysis.connectionType,
-            strength: analysis.strength,
-            isContradiction: analysis.isContradiction || false,
-            evidence: analysis.evidence,
-            isSuggested: true,
-            suggestedBy: 'auto-relationship-detector'
-          },
-          select: {
-            fromBeatId: true,
-            toBeatId: true,
-            connectionType: true,
-            strength: true
-          }
-        });
-        created.push(conn);
-      } catch (e) {
-        // Likely unique constraint / race; just skip.
-        skipped.push({ reason: 'create_failed', fromBeatId: a.id, toBeatId: b.id });
-      }
-    }
+    });
 
     return NextResponse.json({
       success: true,
       userId,
       noteId: body.noteId ?? null,
       beatsConsidered: beats.length,
-      pairsConsidered: pairs.length,
+      pairsConsidered,
       createdCount: created.length,
       created,
       skippedCount: skipped.length,
       skipped,
-      params: { maxPairs, minStrength, allowContradictions }
+      params: { maxPairs, minStrength, allowContradictions, preferCheapSimilarity, cheapSimilarityThreshold }
     });
   } catch (error) {
     console.error('Error detecting connections:', error);

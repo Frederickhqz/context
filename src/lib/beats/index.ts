@@ -9,7 +9,7 @@ export { BeatExtractor, getBeatExtractor } from './extractor';
 export { EXTRACTION_PROMPTS, getExtractionPrompt, parseExtractionResult } from './prompts';
 
 // On-device AI
-export { WebLLMProvider, getLocalProvider, RECOMMENDED_MODEL } from './webllm-provider';
+export { WebLLMProvider, getLocalProvider, RECOMMENDED_EXTRACTION_MODEL } from './webllm-provider';
 
 // Embeddings
 export { EmbeddingService, getEmbeddingService, RECOMMENDED_EMBEDDING_MODEL } from './embedding';

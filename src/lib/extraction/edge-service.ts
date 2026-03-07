@@ -2,42 +2,10 @@
 // Uses WebLLM for browser-based inference with Gemma 3 models
 
 import type { ExtractedBeat, BeatType, BeatConnectionType } from '../beats/types';
+import { EXTRACTION_MODELS, type ExtractionModelId, RECOMMENDED_EXTRACTION_MODEL } from '../beats/config';
 
-// Supported models for extraction
-const MODELS = {
-  // Recommended: Gemma 3 1B - best balance for text extraction
-  'gemma-3-1b': {
-    name: 'gemma-3-1b-it-q4f16_1-MLC',
-    sizeMB: 1400,
-    minRamMB: 2000,
-    contextWindow: 128000,
-    multimodal: false,
-    recommended: true,
-    description: 'Gemma 3 1B - Best for text extraction, 128K context'
-  },
-  // Alternative: Gemma 3n E2B - multimodal extraction
-  'gemma-3n-e2b': {
-    name: 'gemma-3n-e2b-q4f16_1-MLC',
-    sizeMB: 2500,
-    minRamMB: 4000,
-    contextWindow: 32000,
-    multimodal: true,
-    recommended: false,
-    description: 'Gemma 3n E2B - Multimodal (text, images, audio)'
-  },
-  // Smallest: Gemma 3 270M - simple tasks only
-  'gemma-3-270m': {
-    name: 'gemma-3-270m-q4f16_1-MLC',
-    sizeMB: 300,
-    minRamMB: 500,
-    contextWindow: 32000,
-    multimodal: false,
-    recommended: false,
-    description: 'Gemma 3 270M - Ultra-light, simple extraction only'
-  }
-} as const;
-
-export type ModelId = keyof typeof MODELS;
+// Re-export model ID type
+export type ModelId = ExtractionModelId;
 
 // Extraction prompt for beats
 const EXTRACTION_PROMPT = `You are a literary analysis assistant. Extract "beats" from the given text.
@@ -162,7 +130,7 @@ export class EdgeExtractionService {
   private deviceId: string;
   private deviceModel: string;
 
-  constructor(model: ModelId = 'gemma-3-1b') {
+  constructor(model: ModelId = RECOMMENDED_EXTRACTION_MODEL) {
     this.model = model;
     this.deviceId = this.getDeviceId();
     this.deviceModel = this.getDeviceModel();
@@ -190,7 +158,7 @@ export class EdgeExtractionService {
     try {
       // Dynamically import WebLLM
       const webllm = await import('@mlc-ai/web-llm');
-      const modelConfig = MODELS[this.model];
+      const modelConfig = EXTRACTION_MODELS[this.model];
 
       onProgress?.({ status: 'loading', progress: 0 });
 
@@ -225,10 +193,10 @@ export class EdgeExtractionService {
     }
 
     const webllm = await import('@mlc-ai/web-llm');
-    const modelConfig = MODELS[this.model];
+    const modelConfig = EXTRACTION_MODELS[this.model];
 
     // Truncate text if needed (respect context window)
-    const maxLength = modelConfig.contextWindow - 1000; // Leave room for prompt + response
+    const maxLength = (modelConfig.contextLength || 32000) - 1000; // Leave room for prompt + response
     const truncatedText = text.length > maxLength 
       ? text.slice(0, maxLength) + '\n...[truncated]'
       : text;
@@ -416,16 +384,16 @@ export class EdgeExtractionService {
   static async getModelsStatus(): Promise<ModelStatus[]> {
     const models: ModelStatus[] = [];
 
-    for (const [id, config] of Object.entries(MODELS)) {
+    for (const [id, config] of Object.entries(EXTRACTION_MODELS)) {
       models.push({
         id,
-        name: config.name,
-        sizeMB: config.sizeMB,
-        minRamMB: config.minRamMB,
-        contextWindow: config.contextWindow,
-        multimodal: config.multimodal,
-        recommended: config.recommended,
-        description: config.description,
+        name: config.displayName,
+        sizeMB: parseInt(config.size?.replace(/[^\d]/g, '') || '0'),
+        minRamMB: parseInt(config.size?.replace(/[^\d]/g, '') || '0') * 2, // Estimate 2x for RAM
+        contextWindow: config.contextLength || 32000,
+        multimodal: (config.capabilities as readonly string[] | undefined)?.some(c => c === 'vision') || false,
+        recommended: config.recommended || false,
+        description: config.description || '',
         downloaded: false, // Would need to check IndexedDB
         downloading: false,
         progress: 0
@@ -491,7 +459,7 @@ export class EdgeExtractionService {
 
     try {
       const cache = await caches.open('webllm-models');
-      await cache.delete(MODELS[model].name);
+      await cache.delete(EXTRACTION_MODELS[model].webllmId || '');
     } catch (error) {
       console.error('Failed to delete cached model:', error);
     }

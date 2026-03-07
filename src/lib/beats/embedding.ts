@@ -1,40 +1,9 @@
 // Embedding Service - Local and cloud embeddings for semantic search
-// Uses Transformers.js for local embeddings, falls back to cloud
+// Uses Transformers.js for local embeddings (EmbeddingGemma), falls back to cloud
 
 'use client';
 
-// Embedding model options
-const EMBEDDING_MODELS = {
-  'local-mini': {
-    name: 'all-MiniLM-L6-v2',
-    dimensions: 384,
-    size: '~80MB',
-    local: true,
-    recommended: true
-  },
-  'local-mpnet': {
-    name: 'all-mpnet-base-v2',
-    dimensions: 768,
-    size: '~420MB',
-    local: true,
-    recommended: false
-  },
-  'local-bge': {
-    name: 'BAAI/bge-small-en-v1.5',
-    dimensions: 384,
-    size: '~130MB',
-    local: true,
-    recommended: false
-  },
-  'cloud-ollama': {
-    name: 'qwen3-embedding:4b',
-    dimensions: 768,
-    local: false,
-    recommended: false
-  }
-};
-
-type EmbeddingModelId = keyof typeof EMBEDDING_MODELS;
+import { EMBEDDING_MODELS, type EmbeddingModelId, RECOMMENDED_EMBEDDING_MODEL, CLOUD_CONFIG } from './config';
 
 export interface EmbeddingOptions {
   model?: EmbeddingModelId;
@@ -48,7 +17,7 @@ export class EmbeddingService {
   private onProgress?: (progress: number) => void;
   
   constructor(options: EmbeddingOptions = {}) {
-    this.model = options.model || 'local-mini';
+    this.model = options.model || RECOMMENDED_EMBEDDING_MODEL;
     this.onProgress = options.onProgress;
   }
   
@@ -154,15 +123,14 @@ export class EmbeddingService {
    * Cloud embedding via Ollama
    */
   private async embedCloud(text: string): Promise<number[]> {
-    const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-    const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'qwen3-embedding:4b';
+    const { ollamaUrl, ollamaEmbedModel } = CLOUD_CONFIG;
     
     try {
-      const response = await fetch(`${OLLAMA_URL}/api/embeddings`, {
+      const response = await fetch(`${ollamaUrl}/api/embeddings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: OLLAMA_EMBED_MODEL,
+          model: ollamaEmbedModel,
           prompt: text
         })
       });
@@ -229,6 +197,27 @@ export class EmbeddingService {
   }
   
   /**
+   * Get supported matryoshka dimensions (if available)
+   */
+  getMatryoshkaDimensions(): number[] | null {
+    const model = EMBEDDING_MODELS[this.model];
+    if ('matryoshka' in model && model.matryoshka) {
+      return [...model.matryoshka]; // Convert readonly tuple to mutable array
+    }
+    return null;
+  }
+  
+  /**
+   * Truncate embedding to smaller dimension (for Matryoshka models)
+   */
+  truncateEmbedding(embedding: number[], targetDim: number): number[] {
+    if (embedding.length < targetDim) {
+      throw new Error(`Cannot truncate: embedding (${embedding.length}) is smaller than target (${targetDim})`);
+    }
+    return embedding.slice(0, targetDim);
+  }
+  
+  /**
    * Unload model to free memory
    */
   async unload(): Promise<void> {
@@ -251,6 +240,6 @@ export function getEmbeddingService(options?: EmbeddingOptions): EmbeddingServic
 }
 
 /**
- * Recommended local embedding model
+ * Recommended local embedding model (EmbeddingGemma 308M)
  */
-export const RECOMMENDED_EMBEDDING_MODEL: EmbeddingModelId = 'local-mini';
+export { RECOMMENDED_EMBEDDING_MODEL } from './config';

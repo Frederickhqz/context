@@ -1,9 +1,10 @@
-// WebLLM Provider - On-device AI processing
+// WebLLM Provider - On-device AI processing with Gemma 3 Family
 // Falls back to cloud (Ollama) when local model unavailable
 
 'use client';
 
-import type { ExtractedBeat, ExtractedConnection } from './types';
+import type { ExtractedBeat } from './types';
+import { EXTRACTION_MODELS, type ExtractionModelId, RECOMMENDED_EXTRACTION_MODEL, CLOUD_CONFIG } from './config';
 
 // WebLLM types (from @mlc-ai/web-llm)
 interface ChatCompletionMessageParam {
@@ -25,46 +26,22 @@ interface WebLLMLoadResult {
   error?: string;
 }
 
-// Model configurations
-const LOCAL_MODELS = {
-  'qwen2.5-1.5b': {
-    name: 'Qwen 2.5 1.5B',
-    size: '~1GB',
-    recommended: true,
-    capabilities: ['extraction', 'classification', 'embedding']
-  },
-  'phi-3-mini': {
-    name: 'Phi-3 Mini',
-    size: '~2GB',
-    recommended: false,
-    capabilities: ['extraction', 'reasoning']
-  },
-  'gemma-2-2b': {
-    name: 'Gemma 2 2B',
-    size: '~2GB',
-    recommended: false,
-    capabilities: ['extraction', 'classification']
-  }
-};
-
-type LocalModelId = keyof typeof LOCAL_MODELS;
-
 export interface WebLLMConfig {
-  model: LocalModelId;
+  model?: ExtractionModelId;
   onProgress?: (progress: number, status: string) => void;
   onComplete?: () => void;
   onError?: (error: Error) => void;
 }
 
 export class WebLLMProvider {
-  private model: LocalModelId;
+  private model: ExtractionModelId;
   private engine: unknown = null;
   private loaded = false;
   private loading = false;
   private onProgress?: (progress: number, status: string) => void;
   
-  constructor(config: WebLLMConfig) {
-    this.model = config.model;
+  constructor(config: WebLLMConfig = {}) {
+    this.model = config.model || RECOMMENDED_EXTRACTION_MODEL;
     this.onProgress = config.onProgress;
   }
   
@@ -150,12 +127,8 @@ export class WebLLMProvider {
    * Get the full model ID for WebLLM
    */
   private getModelId(): string {
-    const modelMap: Record<LocalModelId, string> = {
-      'qwen2.5-1.5b': 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
-      'phi-3-mini': 'Phi-3-mini-4k-instruct-q4f16_1-MLC',
-      'gemma-2-2b': 'gemma-2-2b-it-q4f16_1-MLC'
-    };
-    return modelMap[this.model];
+    const modelConfig = EXTRACTION_MODELS[this.model];
+    return modelConfig.webllmId || `gemma-3-1b-it-q4f16_1-MLC`;
   }
   
   /**
@@ -264,7 +237,7 @@ Output ONLY valid JSON with this structure:
    * Get model info
    */
   getModelInfo() {
-    return LOCAL_MODELS[this.model];
+    return EXTRACTION_MODELS[this.model];
   }
   
   /**
@@ -282,13 +255,13 @@ let localProvider: WebLLMProvider | null = null;
  * Get or create the local LLM provider
  */
 export function getLocalProvider(config?: WebLLMConfig): WebLLMProvider {
-  if (!localProvider && config) {
+  if (!localProvider) {
     localProvider = new WebLLMProvider(config);
   }
   return localProvider!;
 }
 
 /**
- * Recommended model for extraction tasks
+ * Recommended model for extraction tasks (Gemma 3 1B)
  */
-export const RECOMMENDED_MODEL: LocalModelId = 'qwen2.5-1.5b';
+export { RECOMMENDED_EXTRACTION_MODEL } from './config';

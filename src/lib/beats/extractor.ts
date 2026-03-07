@@ -2,6 +2,7 @@
 // Uses edge-device WebLLM (Gemma 3) when available, falls back to cloud
 
 import { ExtractedBeat, ExtractedConnection, BeatType, BeatConnectionType } from './types';
+import { CLOUD_CONFIG, RECOMMENDED_EXTRACTION_MODEL, type ExtractionModelId } from './config';
 
 // Extraction prompt template
 const EXTRACTION_PROMPT = `You are a literary analysis assistant. Extract "beats" from the given text.
@@ -180,17 +181,16 @@ export class BeatExtractor {
    * Extract using cloud API (Ollama)
    */
   private async extractFromCloud(text: string, options: ExtractionOptions): Promise<ExtractedBeat[]> {
-    const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-    const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3.5:397b-cloud';
+    const { ollamaUrl, ollamaModel } = CLOUD_CONFIG;
     
     options.onProgress?.(10, 'connecting to cloud');
     
     try {
-      const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+      const response = await fetch(`${ollamaUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: OLLAMA_MODEL,
+          model: ollamaModel,
           prompt: EXTRACTION_PROMPT.replace('{text}', text),
           stream: false,
           options: {
@@ -331,8 +331,7 @@ export class BeatExtractor {
     }
     
     // Fallback to cloud
-    const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-    const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3.5:397b-cloud';
+    const { ollamaUrl, ollamaModel } = CLOUD_CONFIG;
     
     try {
       const prompt = CONNECTION_PROMPT
@@ -343,11 +342,11 @@ export class BeatExtractor {
         .replace('{name2}', beat2.name)
         .replace('{summary2}', beat2.summary || '');
       
-      const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+      const response = await fetch(`${ollamaUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: OLLAMA_MODEL,
+          model: ollamaModel,
           prompt,
           stream: false,
           options: { temperature: 0.3 }

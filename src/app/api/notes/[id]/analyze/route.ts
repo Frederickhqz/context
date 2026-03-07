@@ -1,21 +1,29 @@
 // Note Analysis API - Trigger beat extraction for a note
+// POST /api/notes/[id]/analyze
+//
+// On re-analysis: wipes prior note-beat links and auto-suggested connections,
+// then re-extracts beats and infers connections.
+
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { requireUser, AuthError } from '@/lib/auth/server';
 
-// POST /api/notes/[id]/analyze - Trigger beat extraction
+// POST /api/notes/[id]/analyze - Trigger beat extraction (wipe + regenerate)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const user = await requireUser(request);
+    const { id: noteId } = await params;
     const body = await request.json();
 
     // Get the note
-    const note = await prisma.note.findUnique({
-      where: { id },
+    const note = await prisma.note.findFirst({
+      where: { id: noteId, userId: user.id },
       select: {
         id: true,
+        userId: true,
         title: true,
         content: true,
         contentPlain: true,
@@ -25,13 +33,9 @@ export async function POST(
     });
 
     if (!note) {
-      return NextResponse.json(
-        { error: 'Note not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Note not found' }, { status: 404 });
     }
 
-    // Get the text to analyze
     const text = note.contentPlain || note.content || '';
 
     if (!text || text.trim().length < 10) {
@@ -41,51 +45,87 @@ export async function POST(
       );
     }
 
-    // Update analysis status
+    // Mark as processing
     await prisma.note.update({
-      where: { id },
-      data: {
-        analysisStatus: 'PROCESSING',
-        analyzedAt: new Date()
-      }
+      where: { id: noteId },
+      data: { analysisStatus: 'PROCESSING', analyzedAt: new Date() }
     });
 
     try {
-      // Import the beat extractor
+      // === WIPE PHASE ===
+      // Get beat IDs currently linked to this note
+      const existingNoteBeats = await prisma.noteBeat.findMany({
+        where: { noteId },
+        select: { beatId: true }
+      });
+      const existingBeatIds = existingNoteBeats.map(nb => nb.beatId);
+
+      if (existingBeatIds.length > 0) {
+        // Delete auto-suggested connections between these beats
+        await prisma.beatConnection.deleteMany({
+          where: {
+            userId: user.id,
+            isSuggested: true,
+            OR: [
+              { fromBeatId: { in: existingBeatIds } },
+              { toBeatId: { in: existingBeatIds } }
+            ]
+          }
+        });
+
+        // Delete note-beat links
+        await prisma.noteBeat.deleteMany({
+          where: { noteId }
+        });
+
+        // Optional: delete orphan beats that have no other note links
+        // (keeping this simple for now - beats are reusable)
+      }
+
+      // === EXTRACT PHASE ===
       const { getBeatExtractor } = await import('@/lib/beats/extractor');
       const extractor = getBeatExtractor();
 
-      // Extract beats from the text
-      const extractedBeats = await extractor.extract(text, {});
+      const extractedBeats = await extractor.extract(text, {
+        model: body.model || 'cloud'
+      });
 
-      // Store extracted beats
-      const createdBeats = [];
+      const createdBeats: Array<{ id: string; beatType: string; name: string; summary: string | null }> = [];
+
       for (const extractedBeat of extractedBeats) {
-        // Check if beat already exists
+        // Check if beat already exists (global dedup by name+type)
         const existing = await prisma.beat.findFirst({
           where: {
-            userId: 'demo-user',
+            userId: user.id,
             name: extractedBeat.name,
             beatType: extractedBeat.type
           }
         });
 
+        let beat: { id: string; beatType: string; name: string; summary: string | null };
+
         if (existing) {
-          // Link existing beat to note
+          // Increment frequency and link to note
+          await prisma.beat.update({
+            where: { id: existing.id },
+            data: { frequency: { increment: 1 } }
+          });
+
           await prisma.noteBeat.create({
             data: {
-              noteId: id,
+              noteId,
               beatId: existing.id,
               relevance: extractedBeat.confidence,
               mentions: 1
             }
           });
-          createdBeats.push(existing);
+
+          beat = { id: existing.id, beatType: existing.beatType, name: existing.name, summary: existing.summary };
         } else {
           // Create new beat
-          const beat = await prisma.beat.create({
+          const created = await prisma.beat.create({
             data: {
-              userId: 'demo-user',
+              userId: user.id,
               beatType: extractedBeat.type,
               name: extractedBeat.name,
               summary: extractedBeat.summary,
@@ -94,76 +134,72 @@ export async function POST(
               source: 'AUTO',
               confidence: extractedBeat.confidence,
               noteBeats: {
-                create: {
-                  noteId: id,
-                  relevance: extractedBeat.confidence,
-                  mentions: 1
-                }
+                create: { noteId, relevance: extractedBeat.confidence, mentions: 1 }
               }
             }
           });
-          createdBeats.push(beat);
+          beat = { id: created.id, beatType: created.beatType, name: created.name, summary: created.summary };
         }
+
+        createdBeats.push(beat);
       }
 
-      // Create connections between beats
+      // === CONNECTIONS PHASE ===
+      // Trigger connection inference for this note
       let connectionsCreated = 0;
-      for (const extractedBeat of extractedBeats) {
-        if (extractedBeat.connections) {
-          for (const conn of extractedBeat.connections) {
-            const fromBeat = createdBeats.find(b => b.name === extractedBeat.name);
-            const toBeat = createdBeats.find(b => b.name === conn.toBeatName);
-            if (fromBeat && toBeat) {
-              await prisma.beatConnection.create({
-                data: {
-                  userId: 'demo-user',
-                  fromBeatId: fromBeat.id,
-                  toBeatId: toBeat.id,
-                  connectionType: conn.type,
-                  strength: conn.strength,
-                  isContradiction: false
-                }
-              });
-              connectionsCreated++;
+
+      if (createdBeats.length >= 2) {
+        try {
+          const detectRes = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/beats/detect-connections`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: user.id,
+                noteId,
+                maxPairs: 30,
+                minStrength: 0.65
+              })
             }
+          );
+
+          if (detectRes.ok) {
+            const detectData = await detectRes.json();
+            connectionsCreated = detectData.createdCount || 0;
           }
+        } catch (connErr) {
+          console.error('Connection detection failed (non-fatal):', connErr);
         }
       }
 
-      // Update analysis status
+      // Mark completed
       await prisma.note.update({
-        where: { id },
-        data: {
-          analysisStatus: 'COMPLETED',
-          analysisError: null
-        }
+        where: { id: noteId },
+        data: { analysisStatus: 'COMPLETED', analysisError: null }
       });
 
       return NextResponse.json({
         success: true,
-        noteId: id,
+        noteId,
         beatsExtracted: createdBeats.length,
         connectionsCreated,
-        beats: createdBeats.map(b => ({
-          id: b.id,
-          type: b.beatType,
-          name: b.name,
-          summary: b.summary
-        }))
+        beats: createdBeats
       });
     } catch (extractError) {
-      // Mark analysis as failed
       await prisma.note.update({
-        where: { id },
+        where: { id: noteId },
         data: {
           analysisStatus: 'FAILED',
           analysisError: extractError instanceof Error ? extractError.message : 'Unknown error'
         }
       });
-
       throw extractError;
     }
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('Error analyzing note:', error);
     return NextResponse.json(
       { error: 'Failed to analyze note', details: error instanceof Error ? error.message : 'Unknown error' },
@@ -178,10 +214,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const user = await requireUser(request);
+    const { id: noteId } = await params;
 
-    const note = await prisma.note.findUnique({
-      where: { id },
+    const note = await prisma.note.findFirst({
+      where: { id: noteId, userId: user.id },
       select: {
         id: true,
         analysisStatus: true,
@@ -204,14 +241,11 @@ export async function GET(
     });
 
     if (!note) {
-      return NextResponse.json(
-        { error: 'Note not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Note not found' }, { status: 404 });
     }
 
     return NextResponse.json({
-      noteId: id,
+      noteId,
       status: note.analysisStatus,
       analyzedAt: note.analyzedAt,
       error: note.analysisError,
@@ -226,10 +260,10 @@ export async function GET(
       }))
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('Error getting analysis status:', error);
-    return NextResponse.json(
-      { error: 'Failed to get analysis status' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to get analysis status' }, { status: 500 });
   }
 }

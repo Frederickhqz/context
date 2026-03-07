@@ -74,6 +74,16 @@ export async function PATCH(
       data,
     });
 
+    // Trigger re-analysis if content changed (wipe + regenerate)
+    if (typeof body.content !== 'undefined') {
+      // Fire-and-forget; don't block response
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/notes/${id}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      }).catch(err => console.error('Failed to trigger re-analysis:', err));
+    }
+
     return NextResponse.json({ note });
   } catch (error) {
     if (error instanceof AuthError) {

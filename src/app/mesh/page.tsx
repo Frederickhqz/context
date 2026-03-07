@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useBeatMesh, useBeatStats } from '@/lib/beats/hooks';
 import { BeatType, BeatConnectionType, BEAT_TYPE_CONFIG, CONNECTION_TYPE_CONFIG } from '@/lib/beats/types';
 
-// Dynamic import to avoid SSR issues with react-force-graph
+// Dynamic imports for SSR-safe loading
 const BeatMesh3D = dynamic(
   () => import('@/components/mesh/BeatMesh3D').then(mod => ({ default: mod.BeatMesh3D })),
   { 
@@ -16,6 +16,18 @@ const BeatMesh3D = dynamic(
           <div className="animate-spin w-8 h-8 border-2 border-blue-500 rounded-full border-t-transparent mx-auto mb-2" />
           <p className="text-gray-400">Loading 3D viewer...</p>
         </div>
+      </div>
+    )
+  }
+);
+
+const BeatMesh3DMobile = dynamic(
+  () => import('@/components/mesh/BeatMeshMobile').then(mod => ({ default: mod.BeatMesh3DMobile })),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="absolute inset-0 flex items-center justify-center bg-gray-950">
+        <p className="text-gray-400">Loading 3D viewer...</p>
       </div>
     )
   }
@@ -275,7 +287,7 @@ export default function MeshPage() {
           {!loading && !error && mesh && (
             <>
               {viewMode === '3d' ? (
-                <BeatMesh3D
+                <BeatMesh3DMobile
                   mesh={mesh}
                   selectedBeatId={selectedBeatId}
                   hoveredBeatId={hoveredBeatId}

@@ -322,6 +322,77 @@ const TOOLS = [
       },
       required: ["fromNoteId", "toNoteId"]
     }
+  },
+  {
+    name: "get_beats",
+    description: "Retrieve beats from the user's collection. Returns beat details including connections.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        beatType: {
+          type: "string",
+          enum: ["STORY", "SCENE", "CHAPTER", "EVENT", "CHARACTER", "PLACE", "OBJECT", "CREATURE", "THEME", "MOTIF", "IDEA", "QUESTION", "INSIGHT", "RELATIONSHIP", "CONFLICT", "RESOLUTION", "WORLD", "DIMENSION", "TIMELINE", "FEELING", "MOOD", "CUSTOM"],
+          description: "Filter by beat type"
+        },
+        limit: {
+          type: "number",
+          default: 20,
+          description: "Maximum results"
+        },
+        includeConnections: {
+          type: "boolean",
+          default: true,
+          description: "Include beat connections"
+        }
+      }
+    }
+  },
+  {
+    name: "get_mesh",
+    description: "Retrieve the full beat mesh (nodes and edges) for visualization or analysis.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        beatId: {
+          type: "string",
+          description: "Optional: Get mesh around a specific beat"
+        },
+        depth: {
+          type: "number",
+          default: 2,
+          description: "Connection depth to include"
+        },
+        minStrength: {
+          type: "number",
+          default: 0.5,
+          description: "Minimum connection strength"
+        }
+      }
+    }
+  },
+  {
+    name: "suggest_connections",
+    description: "Get AI-powered connection suggestions for a beat.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        beatId: {
+          type: "string",
+          description: "Beat ID to find suggestions for"
+        },
+        limit: {
+          type: "number",
+          default: 10,
+          description: "Maximum suggestions"
+        },
+        useLLM: {
+          type: "boolean",
+          default: true,
+          description: "Use LLM for refined suggestions"
+        }
+      },
+      required: ["beatId"]
+    }
   }
 ];
 
@@ -384,6 +455,15 @@ async function handleToolCall(name: string, args: Record<string, unknown>) {
 
       case "connect_notes":
         return handleConnectNotes(args);
+
+      case "get_beats":
+        return handleGetBeats(args);
+
+      case "get_mesh":
+        return handleGetMesh(args);
+
+      case "suggest_connections":
+        return handleSuggestConnections(args);
 
       default:
         return NextResponse.json(
@@ -1004,6 +1084,264 @@ async function handleConnectNotes(args: Record<string, unknown>) {
           type: connectionType,
           strength,
         },
+      }, null, 2)
+    }]
+  });
+}
+
+// New MCP tools for beat mesh
+async function handleGetBeats(args: Record<string, unknown>) {
+  const { beatType, limit = 20, includeConnections = true } = args as {
+    beatType?: string;
+    limit?: number;
+    includeConnections?: boolean;
+  };
+
+  const where = beatType ? { beatType: beatType as BeatType } : {};
+
+  let beats;
+  if (includeConnections) {
+    beats = await prisma.beat.findMany({
+      where: {
+        userId: "demo-user",
+        ...where,
+      },
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: {
+        connections: {
+          take: 10,
+          select: {
+            id: true,
+            toBeatId: true,
+            connectionType: true,
+            strength: true,
+          },
+        },
+        reverseConnections: {
+          take: 10,
+          select: {
+            id: true,
+            fromBeatId: true,
+            connectionType: true,
+            strength: true,
+          },
+        },
+      },
+    });
+  } else {
+    beats = await prisma.beat.findMany({
+      where: {
+        userId: "demo-user",
+        ...where,
+      },
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  const formattedBeats = beats.map((b) => {
+    const base: any = {
+      id: b.id,
+      type: b.beatType,
+      name: b.name,
+      summary: b.summary,
+      intensity: b.intensity,
+      valence: b.valence,
+    };
+    if (includeConnections) {
+      const bwc = b as any;
+      base.connections = [
+        ...((bwc.connections as any[]) || []).map((c) => ({
+          to: c.toBeatId,
+          type: c.connectionType,
+          strength: c.strength,
+        })),
+        ...((bwc.reverseConnections as any[]) || []).map((c) => ({
+          from: c.fromBeatId,
+          type: c.connectionType,
+          strength: c.strength,
+        })),
+      ];
+    }
+    return base;
+  });
+
+  return NextResponse.json({
+    content: [{
+      type: "text",
+      text: JSON.stringify({
+        beats: formattedBeats,
+        count: beats.length,
+      }, null, 2)
+    }]
+  });
+}
+
+async function handleGetMesh(args: Record<string, unknown>) {
+  const { beatId, depth = 2, minStrength = 0.5 } = args as {
+    beatId?: string;
+    depth?: number;
+    minStrength?: number;
+  };
+
+  if (beatId) {
+    // Get mesh around specific beat
+    const beat = await prisma.beat.findUnique({
+      where: { id: beatId },
+      include: {
+        connections: {
+          where: { strength: { gte: minStrength } },
+          include: { toBeat: true },
+        },
+        reverseConnections: {
+          where: { strength: { gte: minStrength } },
+          include: { fromBeat: true },
+        },
+      },
+    });
+
+    if (!beat) {
+      return NextResponse.json({
+        content: [{ type: "text", text: JSON.stringify({ error: "Beat not found" }, null, 2) }]
+      });
+    }
+
+    const nodes = new Map();
+    const edges: any[] = [];
+
+    // Add center node
+    nodes.set(beat.id, {
+      id: beat.id,
+      type: beat.beatType,
+      name: beat.name,
+      summary: beat.summary,
+    });
+
+    // Add connected beats
+    const beatWithConnections = beat as any;
+    for (const conn of beatWithConnections.connections || []) {
+      if (!nodes.has(conn.toBeatId)) {
+        nodes.set(conn.toBeatId, {
+          id: conn.toBeatId,
+          type: conn.toBeat.beatType,
+          name: conn.toBeat.name,
+          summary: conn.toBeat.summary,
+        });
+      }
+      edges.push({
+        from: beat.id,
+        to: conn.toBeatId,
+        type: conn.connectionType,
+        strength: conn.strength,
+      });
+    }
+
+    for (const conn of beatWithConnections.reverseConnections || []) {
+      if (!nodes.has(conn.fromBeatId)) {
+        nodes.set(conn.fromBeatId, {
+          id: conn.fromBeatId,
+          type: conn.fromBeat.beatType,
+          name: conn.fromBeat.name,
+          summary: conn.fromBeat.summary,
+        });
+      }
+      edges.push({
+        from: conn.fromBeatId,
+        to: beat.id,
+        type: conn.connectionType,
+        strength: conn.strength,
+      });
+    }
+
+    return NextResponse.json({
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          nodes: Array.from(nodes.values()),
+          edges,
+          center: beatId,
+        }, null, 2)
+      }]
+    });
+  }
+
+  // Get full mesh
+  const [beats, connections] = await Promise.all([
+    prisma.beat.findMany({
+      where: { userId: "demo-user" },
+      select: { id: true, beatType: true, name: true, summary: true, intensity: true },
+    }),
+    prisma.beatConnection.findMany({
+      where: {
+        userId: "demo-user",
+        strength: { gte: minStrength },
+      },
+      select: {
+        fromBeatId: true,
+        toBeatId: true,
+        connectionType: true,
+        strength: true,
+      },
+    }),
+  ]);
+
+  return NextResponse.json({
+    content: [{
+      type: "text",
+      text: JSON.stringify({
+        nodes: beats.map((b) => ({
+          id: b.id,
+          type: b.beatType,
+          name: b.name,
+          summary: b.summary,
+          intensity: b.intensity,
+        })),
+        edges: connections.map((c) => ({
+          from: c.fromBeatId,
+          to: c.toBeatId,
+          type: c.connectionType,
+          strength: c.strength,
+        })),
+        stats: {
+          nodeCount: beats.length,
+          edgeCount: connections.length,
+        },
+      }, null, 2)
+    }]
+  });
+}
+
+async function handleSuggestConnections(args: Record<string, unknown>) {
+  const { beatId, limit = 10, useLLM = true } = args as {
+    beatId: string;
+    limit?: number;
+    useLLM?: boolean;
+  };
+
+  // Get beat
+  const beat = await prisma.beat.findUnique({
+    where: { id: beatId },
+    select: { id: true, name: true, beatType: true, summary: true },
+  });
+
+  if (!beat) {
+    return NextResponse.json({
+      content: [{ type: "text", text: JSON.stringify({ error: "Beat not found" }, null, 2) }]
+    });
+  }
+
+  // Fetch suggestions from the suggestions API logic
+  const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/beats/suggestions/${beatId}?limit=${limit}&useLLM=${useLLM}`);
+  const data = await response.json();
+
+  return NextResponse.json({
+    content: [{
+      type: "text",
+      text: JSON.stringify({
+        beat: { id: beat.id, name: beat.name, type: beat.beatType },
+        suggestions: data.suggestions || [],
+        stats: data.stats || {},
       }, null, 2)
     }]
   });

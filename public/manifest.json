@@ -1,26 +1,64 @@
 {
-  "name": "Context",
+  "name": "Context - Your Second Brain",
   "short_name": "Context",
-  "description": "Your second brain for notes, ideas, and connections",
+  "description": "Personal knowledge management with beats, connections, and semantic search",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFFFFF",
+  "orientation": "portrait-primary",
+  "scope": "/",
   "theme_color": "#6366F1",
+  "background_color": "#0F172A",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
       "src": "/icon.svg",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     },
     {
       "src": "/apple-touch-icon.svg",
       "sizes": "180x180",
       "type": "image/svg+xml"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "New Note",
+      "short_name": "Note",
+      "description": "Create a new note",
+      "url": "/notes/new",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Beat Mesh",
+      "short_name": "Mesh",
+      "description": "View the beat mesh",
+      "url": "/mesh",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Search",
+      "short_name": "Search",
+      "description": "Search notes and beats",
+      "url": "/search",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/og-image.svg",
+      "sizes": "1200x630",
+      "type": "image/svg+xml",
+      "form_factor": "wide"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

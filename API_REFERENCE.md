@@ -344,7 +344,51 @@ Body (either `noteId` or `beatIds` required):
 
 Notes:
 - When `preferCheapSimilarity=true`, the API will create `RELATES_TO` suggestions using a cheap lexical similarity heuristic (name+summary) before spending LLM calls.
-- If the cheap similarity doesn’t meet threshold, it falls back to LLM-based relationship inference.
+- If the cheap similarity doesn't meet threshold, it falls back to LLM-based relationship inference.
+
+### Get Connection Suggestions
+
+```http
+GET /api/beats/suggestions/:id
+```
+
+Query params:
+- `limit` - Max suggestions (default: 10, max: 50)
+- `minConfidence` - Minimum confidence level: high, medium, low (default: medium)
+- `useLLM` - Use LLM to refine suggestions (default: true)
+
+Response:
+```json
+{
+  "beatId": "beat_1",
+  "beatName": "The Mentor",
+  "suggestions": [
+    {
+      "fromBeatId": "beat_1",
+      "toBeatId": "beat_2",
+      "toBeatName": "Brother's Betrayal",
+      "toBeatType": "EVENT",
+      "suggestedType": "MIRRORS",
+      "strength": 0.85,
+      "confidence": "high",
+      "evidence": "Both involve betrayal by trusted figures",
+      "source": "llm"
+    }
+  ],
+  "generatedAt": "2026-03-07T18:00:00Z",
+  "stats": {
+    "embeddingCandidates": 20,
+    "lexicalCandidates": 5,
+    "llmAnalyzed": 3,
+    "totalSuggestions": 10
+  }
+}
+```
+
+Sources:
+- `embedding` - Found via vector similarity
+- `lexical` - Found via text overlap
+- `llm` - Refined by LLM analysis
 
 ---
 

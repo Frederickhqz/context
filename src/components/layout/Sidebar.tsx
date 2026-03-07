@@ -47,11 +47,14 @@ export function Sidebar() {
           <NavItem href="/notes" icon="file" active={pathname === "/notes" || pathname === "/"}>
             Notes
           </NavItem>
+          <NavItem href="/universe" icon="globe" active={pathname === "/universe"}>
+            Universe
+          </NavItem>
           <NavItem href="/timeline" icon="calendar" active={pathname === "/timeline"}>
             Timeline
           </NavItem>
           <NavItem href="/visualize" icon="diagram" active={pathname === "/visualize"}>
-            Visualize
+            Graph
           </NavItem>
           <NavItem href="/entities" icon="users" active={pathname === "/entities"}>
             Entities

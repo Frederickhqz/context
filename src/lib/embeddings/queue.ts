@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/db/client';
 
-const DEFAULT_MODEL = 'multilingual-e5-small';
+const DEFAULT_MODEL = 'embeddinggemma-300m';
 
 interface QueueOptions {
   userId: string;

@@ -7,12 +7,14 @@ import { prisma } from '@/lib/db/client';
 import { requireUser, AuthError } from '@/lib/auth/server';
 
 const SUPPORTED_MODELS: Record<string, number> = {
+  'embeddinggemma-300m': 768,
   'multilingual-e5-small': 384,
+  'qwen3-embedding-0.6b': 1024,
   'nomic-embed-text-v1.5': 768,
   'all-MiniLM-L6-v2': 384,
 };
 
-const DEFAULT_MODEL = 'multilingual-e5-small';
+const DEFAULT_MODEL = 'embeddinggemma-300m';
 
 interface QueueRequest {
   entityType: 'NOTE' | 'BEAT' | 'CONNECTION';

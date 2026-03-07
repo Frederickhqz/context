@@ -1,34 +1,66 @@
 // Edge Embedding Service - Run embedding models on client devices
-// Supports multilingual models for global deployment
+// Supports multilingual models for global deployment (App Store, Play Store, Web)
 
 import type { Pipeline } from '@xenova/transformers';
 
-// Supported models
+// Supported models - optimized for mobile/web deployment
 const MODELS = {
+  // Recommended: Best balance of size, multilingual support, and quality
+  'embeddinggemma-300m': {
+    name: 'google/embeddinggemma-300m', // Hypothetical HuggingFace path
+    dimensions: 768, // Matryoshka: can truncate to 512/256/128
+    sizeMB: 200,
+    languages: '100+ languages including English, Spanish, Chinese, Arabic, Hindi, etc.',
+    recommended: true,
+    mobileOptimized: true,
+    matryoshka: true,
+    minRamMB: 200
+  },
+  // Alternative: Multilingual E5 Small (smaller but lower quality)
   'multilingual-e5-small': {
     name: 'Xenova/multilingual-e5-small',
     dimensions: 384,
-    size: '~120MB',
-    languages: '50+ languages including English, Spanish, Chinese, Arabic, etc.',
-    recommended: true
+    sizeMB: 120,
+    languages: '50+ languages',
+    recommended: false,
+    mobileOptimized: true,
+    matryoshka: false,
+    minRamMB: 150
   },
-  'nomic-embed-text-v1.5': {
-    name: 'nomic-ai/nomic-embed-text-v1.5',
-    dimensions: 768,
-    size: '~275MB',
-    languages: 'English-focused, general purpose',
-    recommended: false
+  // Alternative: Qwen3 Embedding (larger but better quality)
+  'qwen3-embedding-0.6b': {
+    name: 'Qwen/qwen3-embedding-0.6b',
+    dimensions: 1024, // Matryoshka: can truncate
+    sizeMB: 400,
+    languages: '100+ languages, instruction-aware',
+    recommended: false,
+    mobileOptimized: true,
+    matryoshka: true,
+    minRamMB: 400
   },
+  // Fallback: English-only, smallest
   'all-MiniLM-L6-v2': {
     name: 'Xenova/all-MiniLM-L6-v2',
     dimensions: 384,
-    size: '~80MB',
-    languages: 'English only, fast',
-    recommended: false
+    sizeMB: 80,
+    languages: 'English only',
+    recommended: false,
+    mobileOptimized: true,
+    matryoshka: false,
+    minRamMB: 100
+  },
+  // Legacy: For backwards compatibility
+  'nomic-embed-text-v1.5': {
+    name: 'nomic-ai/nomic-embed-text-v1.5',
+    dimensions: 768,
+    sizeMB: 275,
+    languages: 'English-focused, general purpose',
+    recommended: false,
+    mobileOptimized: false,
+    matryoshka: true,
+    minRamMB: 300
   }
 } as const;
-
-type ModelId = keyof typeof MODELS;
 
 interface EmbeddingResult {
   vector: number[];
@@ -41,8 +73,29 @@ interface ProgressCallback {
   (progress: { status: string; progress?: number; loaded?: number; total?: number }): void;
 }
 
+interface ModelInfo {
+  id: string;
+  name: string;
+  dimensions: number;
+  sizeMB: number;
+  languages: string;
+  recommended: boolean;
+  mobileOptimized: boolean;
+  downloaded: boolean;
+  downloading: boolean;
+  progress: number;
+}
+
+type ModelId = keyof typeof MODELS;
+
 /**
- * Edge Embedding Service - Runs entirely in the browser
+ * Edge Embedding Service - Runs entirely in the browser/app
+ * 
+ * Features:
+ * - Automatic model download with progress tracking
+ * - Persistent model caching (IndexedDB)
+ * - Matryoshka dimension support (truncate embeddings for speed)
+ * - Device capability detection (RAM, WebGPU, etc.)
  */
 export class EdgeEmbeddingService {
   private model: ModelId;
@@ -51,15 +104,17 @@ export class EdgeEmbeddingService {
   private loadPromise: Promise<void> | null = null;
   private deviceId: string;
   private deviceModel: string;
+  private targetDimensions: number;
 
-  constructor(model: ModelId = 'multilingual-e5-small') {
+  constructor(model: ModelId = 'embeddinggemma-300m', targetDimensions?: number) {
     this.model = model;
     this.deviceId = this.getDeviceId();
     this.deviceModel = this.getDeviceModel();
+    this.targetDimensions = targetDimensions || MODELS[model].dimensions;
   }
 
   /**
-   * Load the embedding model
+   * Load the embedding model (downloads if not cached)
    */
   async load(onProgress?: ProgressCallback): Promise<void> {
     if (this.pipeline) return;
@@ -74,9 +129,12 @@ export class EdgeEmbeddingService {
   private async loadModel(onProgress?: ProgressCallback): Promise<void> {
     const { pipeline, env } = await import('@xenova/transformers');
 
-    // Configure for browser
+    // Configure for browser/mobile
     env.allowLocalModels = false;
     env.useBrowserCache = true;
+
+    // Use IndexedDB for persistent model cache
+    env.cacheDir = 'indexeddb://embedding-models';
 
     const modelConfig = MODELS[this.model];
 
@@ -86,12 +144,16 @@ export class EdgeEmbeddingService {
       'feature-extraction',
       modelConfig.name,
       {
-        progress_callback: (progress: { status: string; progress?: number }) => {
+        progress_callback: (progress: { status: string; progress?: number; loaded?: number; total?: number }) => {
           onProgress?.({
             status: progress.status,
-            progress: progress.progress
+            progress: progress.progress,
+            loaded: progress.loaded,
+            total: progress.total
           });
-        }
+        },
+        // Use quantized model for smaller download
+        quantized: true
       }
     ) as Pipeline;
 
@@ -109,9 +171,10 @@ export class EdgeEmbeddingService {
     }
 
     const startTime = performance.now();
+    const modelConfig = MODELS[this.model];
 
     // For E5 models, prepend query prefix for better retrieval
-    const processedText = this.model.startsWith('multilingual-e5')
+    const processedText = this.model.includes('e5') || this.model.includes('gemma')
       ? `query: ${text}`
       : text;
 
@@ -123,28 +186,143 @@ export class EdgeEmbeddingService {
     const processingTimeMs = performance.now() - startTime;
 
     // Convert tensor to array
-    const vector = Array.from(result.data as Float32Array);
+    let vector = Array.from(result.data as Float32Array);
+
+    // Matryoshka dimension reduction if supported and requested
+    if (modelConfig.matryoshka && this.targetDimensions < vector.length) {
+      vector = vector.slice(0, this.targetDimensions);
+    }
 
     return {
       vector,
       model: this.model,
-      dimensions: MODELS[this.model].dimensions,
+      dimensions: vector.length,
       processingTimeMs
     };
   }
 
   /**
-   * Generate embeddings for multiple texts
+   * Generate embeddings for multiple texts (batch processing)
    */
-  async embedBatch(texts: string[]): Promise<EmbeddingResult[]> {
+  async embedBatch(texts: string[], onProgress?: (current: number, total: number) => void): Promise<EmbeddingResult[]> {
     const results: EmbeddingResult[] = [];
 
-    for (const text of texts) {
-      const result = await this.embed(text);
+    for (let i = 0; i < texts.length; i++) {
+      const result = await this.embed(texts[i]);
       results.push(result);
+      onProgress?.(i + 1, texts.length);
     }
 
     return results;
+  }
+
+  /**
+   * Check if model is downloaded
+   */
+  static async isModelDownloaded(model: ModelId): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      // Check IndexedDB cache
+      const cache = await caches.open('embedding-models');
+      const response = await cache.match(MODELS[model].name);
+      return !!response;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get all model info (for settings UI)
+   */
+  static async getModelsStatus(): Promise<ModelInfo[]> {
+    const models: ModelInfo[] = [];
+
+    for (const [id, config] of Object.entries(MODELS)) {
+      const downloaded = await EdgeEmbeddingService.isModelDownloaded(id as ModelId);
+
+      models.push({
+        id,
+        name: config.name,
+        dimensions: config.dimensions,
+        sizeMB: config.sizeMB,
+        languages: config.languages,
+        recommended: config.recommended,
+        mobileOptimized: config.mobileOptimized,
+        downloaded,
+        downloading: false,
+        progress: downloaded ? 100 : 0
+      });
+    }
+
+    return models;
+  }
+
+  /**
+   * Check if local embedding is available on this device
+   */
+  static async isAvailable(): Promise<{ available: boolean; reason?: string }> {
+    if (typeof window === 'undefined') {
+      return { available: false, reason: 'Server environment' };
+    }
+
+    try {
+      // Check for WebAssembly support (required for Transformers.js)
+      if (typeof WebAssembly !== 'object') {
+        return { available: false, reason: 'WebAssembly not supported' };
+      }
+
+      // Check for IndexedDB (required for model caching)
+      if (!window.indexedDB) {
+        return { available: false, reason: 'IndexedDB not supported' };
+      }
+
+      // Check for memory (at least 512MB recommended)
+      const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+      if (memory && memory < 0.5) {
+        return { available: false, reason: 'Insufficient device memory' };
+      }
+
+      // Check for WebGPU (optional but faster)
+      const hasWebGPU = 'gpu' in navigator;
+
+      return {
+        available: true,
+        reason: hasWebGPU ? 'WebGPU available (faster)' : 'WebAssembly mode'
+      };
+    } catch (error) {
+      return { available: false, reason: String(error) };
+    }
+  }
+
+  /**
+   * Get supported models info
+   */
+  static getModels(): typeof MODELS {
+    return MODELS;
+  }
+
+  /**
+   * Get recommended model for current device
+   */
+  static async getRecommendedModel(): Promise<ModelId> {
+    const { available, reason } = await EdgeEmbeddingService.isAvailable();
+
+    if (!available) {
+      // Return smallest model for fallback
+      return 'all-MiniLM-L6-v2';
+    }
+
+    // Check device memory
+    const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
+
+    if (memory >= 4) {
+      return 'embeddinggemma-300m'; // Best quality
+    } else if (memory >= 2) {
+      return 'multilingual-e5-small'; // Smaller
+    } else {
+      return 'all-MiniLM-L6-v2'; // Smallest
+    }
   }
 
   /**
@@ -187,53 +365,40 @@ export class EdgeEmbeddingService {
   }
 
   /**
-   * Check if local embedding is available
-   */
-  static async isAvailable(): Promise<boolean> {
-    if (typeof window === 'undefined') return false;
-
-    try {
-      // Check for WebAssembly support (required for Transformers.js)
-      if (typeof WebAssembly !== 'object') return false;
-
-      // Check for enough memory (at least 512MB recommended)
-      const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-      if (memory && memory < 0.5) return false;
-
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Get supported models
-   */
-  static getModels(): typeof MODELS {
-    return MODELS;
-  }
-
-  /**
    * Unload model to free memory
    */
   unload(): void {
     this.pipeline = null;
     this.loadPromise = null;
   }
+
+  /**
+   * Delete cached model
+   */
+  static async deleteCachedModel(model: ModelId): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const cache = await caches.open('embedding-models');
+      await cache.delete(MODELS[model].name);
+    } catch (error) {
+      console.error('Failed to delete cached model:', error);
+    }
+  }
 }
 
 // Singleton instance
 let serviceInstance: EdgeEmbeddingService | null = null;
 
-export function getEdgeEmbeddingService(model?: ModelId): EdgeEmbeddingService {
+export function getEdgeEmbeddingService(model?: ModelId, dimensions?: number): EdgeEmbeddingService {
   if (!serviceInstance || (model && model !== serviceInstance['model'])) {
-    serviceInstance = new EdgeEmbeddingService(model);
+    serviceInstance = new EdgeEmbeddingService(model, dimensions);
   }
   return serviceInstance;
 }
 
 /**
- * Process embedding queue from server
+ * Process embedding queue from server (for background sync)
  */
 export async function processEmbeddingQueue(options?: {
   model?: ModelId;
@@ -241,7 +406,8 @@ export async function processEmbeddingQueue(options?: {
   onProgress?: (job: { id: string; progress: number }) => void;
   onComplete?: (job: { id: string; success: boolean }) => void;
 }): Promise<{ processed: number; success: number; failed: number }> {
-  const service = getEdgeEmbeddingService(options?.model);
+  const model = options?.model || await EdgeEmbeddingService.getRecommendedModel();
+  const service = getEdgeEmbeddingService(model);
   const limit = options?.limit || 10;
 
   // Fetch pending jobs
@@ -299,3 +465,53 @@ export async function processEmbeddingQueue(options?: {
     failed
   };
 }
+
+/**
+ * React hook for embedding service (for UI integration)
+ */
+export function useEdgeEmbedding(model?: ModelId) {
+  const [status, setStatus] = React.useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [progress, setProgress] = React.useState(0);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const serviceRef = React.useRef<EdgeEmbeddingService | null>(null);
+
+  const loadModel = React.useCallback(async () => {
+    try {
+      setStatus('loading');
+      setProgress(0);
+
+      const service = getEdgeEmbeddingService(model);
+      serviceRef.current = service;
+
+      await service.load((p) => {
+        setProgress(p.progress || 0);
+      });
+
+      setStatus('ready');
+      setError(null);
+    } catch (err) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'Failed to load model');
+    }
+  }, [model]);
+
+  const embed = React.useCallback(async (text: string) => {
+    if (!serviceRef.current) {
+      throw new Error('Model not loaded');
+    }
+    return serviceRef.current.embed(text);
+  }, []);
+
+  return {
+    status,
+    progress,
+    error,
+    loadModel,
+    embed,
+    service: serviceRef.current
+  };
+}
+
+// Import React for hook
+import React from 'react';

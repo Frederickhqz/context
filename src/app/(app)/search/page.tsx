@@ -3,15 +3,16 @@ import { SearchResults } from '@/components/search/SearchResults';
 import { Icon } from '@/components/ui/Icon';
 
 interface SearchPageProps {
-  searchParams: {
+  searchParams: Promise<{
     q?: string;
     type?: string;
-  };
+  }>;
 }
 
-export default function SearchPage({ searchParams }: SearchPageProps) {
-  const query = searchParams.q || '';
-  const type = searchParams.type || 'semantic';
+export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const params = await searchParams;
+  const query = params.q || '';
+  const type = params.type || 'semantic';
 
   return (
     <div className="space-y-6">

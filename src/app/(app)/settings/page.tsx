@@ -1,3 +1,6 @@
+import { WebLLMSettings } from '@/components/settings/WebLLMSettings';
+import { EmbeddingModelSettings } from '@/components/settings/EmbeddingModelSettings';
+
 export default function SettingsPage() {
   return (
     <div className="space-y-6">
@@ -8,24 +11,36 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="space-y-4">
-        {/* Coming soon */}
+      <div className="space-y-6">
+        {/* AI Models */}
         <div className="rounded-lg border bg-card p-6">
-          <h2 className="text-lg font-medium mb-2">Coming Soon</h2>
-          <p className="text-muted-foreground text-sm">
-            Settings for themes, notifications, data export, and more will be available here.
-          </p>
+          <h2 className="text-lg font-medium mb-4">AI Models</h2>
+          <WebLLMSettings />
+        </div>
+
+        {/* Embedding Models */}
+        <div className="rounded-lg border bg-card p-6">
+          <h2 className="text-lg font-medium mb-4">Embedding Models</h2>
+          <EmbeddingModelSettings />
         </div>
 
         {/* Database status */}
         <div className="rounded-lg border bg-card p-6">
           <h2 className="text-lg font-medium mb-2">Database Status</h2>
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-yellow-500" />
-            <span className="text-sm text-muted-foreground">Demo mode - no database connected</span>
+            <div className="h-2 w-2 rounded-full bg-green-500" />
+            <span className="text-sm text-muted-foreground">Connected to Supabase PostgreSQL</span>
           </div>
           <p className="text-sm text-muted-foreground mt-2">
-            Configure DATABASE_URL in your environment to enable persistence.
+            pgvector enabled for semantic search and embeddings.
+          </p>
+        </div>
+
+        {/* Coming soon */}
+        <div className="rounded-lg border bg-card p-6">
+          <h2 className="text-lg font-medium mb-2">Coming Soon</h2>
+          <p className="text-muted-foreground text-sm">
+            Settings for themes, notifications, data export, and more will be available here.
           </p>
         </div>
       </div>

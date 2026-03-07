@@ -1,12 +1,18 @@
 // Note Analysis API - Trigger beat extraction for a note
 // POST /api/notes/[id]/analyze
 //
-// On re-analysis: wipes prior note-beat links and auto-suggested connections,
-// then re-extracts beats and infers connections.
+// On re-analysis: wipes prior note-beat links, suggested connections, and embeddings,
+// then re-extracts beats, infers connections, and queues embeddings.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { requireUser, AuthError } from '@/lib/auth/server';
+import {
+  queueNoteEmbedding,
+  queueBeatEmbedding,
+  queueConnectionEmbedding,
+  wipeNoteEmbeddings
+} from '@/lib/embeddings/queue';
 
 // POST /api/notes/[id]/analyze - Trigger beat extraction (wipe + regenerate)
 export async function POST(
@@ -61,6 +67,19 @@ export async function POST(
       const existingBeatIds = existingNoteBeats.map(nb => nb.beatId);
 
       if (existingBeatIds.length > 0) {
+        // Get connection IDs for this note's beats
+        const existingConnections = await prisma.beatConnection.findMany({
+          where: {
+            userId: user.id,
+            OR: [
+              { fromBeatId: { in: existingBeatIds } },
+              { toBeatId: { in: existingBeatIds } }
+            ]
+          },
+          select: { id: true }
+        });
+        const existingConnectionIds = existingConnections.map(c => c.id);
+
         // Delete auto-suggested connections between these beats
         await prisma.beatConnection.deleteMany({
           where: {
@@ -72,6 +91,9 @@ export async function POST(
             ]
           }
         });
+
+        // Wipe embeddings for note, beats, and connections
+        await wipeNoteEmbeddings(noteId, existingBeatIds, existingConnectionIds, { userId: user.id });
 
         // Delete note-beat links
         await prisma.noteBeat.deleteMany({
@@ -173,6 +195,41 @@ export async function POST(
         }
       }
 
+      // === EMBEDDINGS PHASE ===
+      // Queue embeddings for note, beats, and connections
+      let embeddingsQueued = 0;
+
+      try {
+        // Queue note embedding
+        await queueNoteEmbedding(noteId, text, { userId: user.id });
+        embeddingsQueued++;
+
+        // Queue beat embeddings
+        for (const beat of createdBeats) {
+          await queueBeatEmbedding(beat.id, beat.name, beat.summary, { userId: user.id });
+          embeddingsQueued++;
+        }
+
+        // Queue connection embeddings (fetch newly created connections)
+        if (connectionsCreated > 0) {
+          const newConnections = await prisma.beatConnection.findMany({
+            where: {
+              userId: user.id,
+              isSuggested: true,
+              fromBeatId: { in: createdBeats.map(b => b.id) }
+            },
+            select: { id: true, evidence: true, description: true }
+          });
+
+          for (const conn of newConnections) {
+            await queueConnectionEmbedding(conn.id, conn.evidence, conn.description, { userId: user.id });
+            embeddingsQueued++;
+          }
+        }
+      } catch (embedErr) {
+        console.error('Failed to queue embeddings (non-fatal):', embedErr);
+      }
+
       // Mark completed
       await prisma.note.update({
         where: { id: noteId },
@@ -184,6 +241,7 @@ export async function POST(
         noteId,
         beatsExtracted: createdBeats.length,
         connectionsCreated,
+        embeddingsQueued,
         beats: createdBeats
       });
     } catch (extractError) {

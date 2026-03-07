@@ -229,6 +229,9 @@ model BeatConnection {
   description     String?             @db.Text
   evidence        String?             @db.Text
   
+  // Embedding for evidence (enables "find similar connections")
+  embedding       Unsupported("vector(768)")?
+  
   // Conflict detection
   isContradiction Boolean             @default(false) @map("is_contradiction")
   contradictionNote String?           @map("contradiction_note") @db.Text
@@ -560,4 +563,49 @@ enum ImportStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EMBEDDINGS - Async embedding queue for edge devices
+// ═══════════════════════════════════════════════════════════════
+
+model Embedding {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  
+  // What entity this embedding belongs to
+  entityType  String   @map("entity_type")  // NOTE | BEAT | CONNECTION
+  entityId    String   @map("entity_id")
+  
+  // Model info
+  model       String   // "multilingual-e5-small" | "nomic-embed-text-v1.5"
+  dimensions  Int      // 384 or 768
+  
+  // The vector (pgvector)
+  vector      Unsupported("vector(768)")?
+  
+  // Text that was embedded (for re-embedding if needed)
+  sourceText  String?  @map("source_text") @db.Text
+  
+  // Status tracking for async processing
+  status      EmbeddingStatus @default(PENDING)
+  error       String?  @db.Text
+  
+  // Device info (for debugging)
+  deviceId    String?  @map("device_id")
+  deviceModel String?  @map("device_model")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([entityType, entityId, model])
+  @@index([userId, status])
+  @@map("embeddings")
+}
+
+enum EmbeddingStatus {
+  PENDING     // Queued for embedding
+  PROCESSING  // Client is computing
+  COMPLETED   // Vector stored
+  FAILED      // Error occurred
 }

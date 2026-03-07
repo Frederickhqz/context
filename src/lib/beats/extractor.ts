@@ -1,5 +1,5 @@
 // Beat Extraction Engine - AI-powered extraction of beats from text
-// Uses on-device WebLLM when available, falls back to cloud
+// Uses edge-device WebLLM (Gemma 3) when available, falls back to cloud
 
 import { ExtractedBeat, ExtractedConnection, BeatType, BeatConnectionType } from './types';
 
@@ -92,69 +92,98 @@ Output ONLY valid JSON:
 }`;
 
 export interface ExtractionOptions {
-  model?: 'local' | 'cloud';
-  onProgress?: (progress: number) => void;
+  model?: 'edge' | 'cloud' | 'auto';
+  onProgress?: (progress: number, status?: string) => void;
   existingBeats?: ExtractedBeat[];
 }
 
+export interface ExtractionResult {
+  beats: ExtractedBeat[];
+  model: string;
+  processingTimeMs: number;
+  fromEdge: boolean;
+}
+
 export class BeatExtractor {
-  private model: 'local' | 'cloud';
-  private localModelAvailable: boolean = false;
+  private preferredModel: 'edge' | 'cloud' | 'auto';
+  private edgeAvailable: boolean | null = null;
   
-  constructor(options: { model?: 'local' | 'cloud' } = {}) {
-    this.model = options.model || 'local';
+  constructor(options: { model?: 'edge' | 'cloud' | 'auto' } = {}) {
+    this.preferredModel = options.model || 'auto';
   }
   
   /**
-   * Check if local model is available
+   * Check if edge extraction (WebLLM) is available
    */
-  async checkLocalModel(): Promise<boolean> {
+  async checkEdgeAvailable(): Promise<boolean> {
+    if (this.edgeAvailable !== null) {
+      return this.edgeAvailable;
+    }
+
     try {
-      // Check if WebLLM is available in browser
-      if (typeof window !== 'undefined' && 'WebLLM' in window) {
-        return true;
-      }
-      return false;
+      // Dynamic import to avoid SSR issues
+      const { EdgeExtractionService } = await import('../extraction/edge-service');
+      const result = await EdgeExtractionService.isAvailable();
+      this.edgeAvailable = result.available;
+      return this.edgeAvailable;
     } catch {
+      this.edgeAvailable = false;
       return false;
     }
   }
   
   /**
    * Extract beats from text
+   * Priority: edge (device) > cloud (Ollama)
    */
   async extract(text: string, options: ExtractionOptions = {}): Promise<ExtractedBeat[]> {
-    const model = options.model || this.model;
+    const model = options.model || this.preferredModel;
     
-    if (model === 'local') {
-      const isAvailable = await this.checkLocalModel();
-      if (!isAvailable) {
-        console.log('Local model not available, falling back to cloud');
-        return this.extractFromCloud(text, options);
+    // Determine which model to use
+    if (model === 'auto') {
+      const edgeAvailable = await this.checkEdgeAvailable();
+      if (edgeAvailable) {
+        return this.extractFromEdge(text, options);
       }
-      return this.extractFromLocal(text, options);
+      return this.extractFromCloud(text, options);
+    }
+    
+    if (model === 'edge') {
+      return this.extractFromEdge(text, options);
     }
     
     return this.extractFromCloud(text, options);
   }
   
   /**
-   * Extract using local WebLLM
+   * Extract using edge-device WebLLM (Gemma 3)
    */
-  private async extractFromLocal(text: string, options: ExtractionOptions): Promise<ExtractedBeat[]> {
-    // This will be implemented when WebLLM integration is added
-    // For now, fall back to cloud
-    console.log('Local extraction not yet implemented, using cloud');
-    return this.extractFromCloud(text, options);
+  private async extractFromEdge(text: string, options: ExtractionOptions): Promise<ExtractedBeat[]> {
+    try {
+      const { getEdgeExtractionService } = await import('../extraction/edge-service');
+      const service = getEdgeExtractionService('gemma-3-1b');
+      
+      const result = await service.extract(text, (progress) => {
+        options.onProgress?.(progress.progress || 0, progress.status);
+      });
+      
+      options.onProgress?.(100, 'complete');
+      return result.beats;
+    } catch (error) {
+      console.error('Edge extraction failed, falling back to cloud:', error);
+      // Fallback to cloud on edge failure
+      return this.extractFromCloud(text, options);
+    }
   }
   
   /**
-   * Extract using cloud API (Ollama or OpenAI)
+   * Extract using cloud API (Ollama)
    */
   private async extractFromCloud(text: string, options: ExtractionOptions): Promise<ExtractedBeat[]> {
-    // Use Ollama API for extraction
     const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
     const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3.5:397b-cloud';
+    
+    options.onProgress?.(10, 'connecting to cloud');
     
     try {
       const response = await fetch(`${OLLAMA_URL}/api/generate`, {
@@ -165,8 +194,8 @@ export class BeatExtractor {
           prompt: EXTRACTION_PROMPT.replace('{text}', text),
           stream: false,
           options: {
-            temperature: 0.3, // Lower temperature for more consistent extraction
-            num_predict: 4096, // Enough tokens for detailed extraction
+            temperature: 0.3,
+            num_predict: 4096,
           }
         })
       });
@@ -175,17 +204,16 @@ export class BeatExtractor {
         throw new Error(`Ollama API error: ${response.status}`);
       }
       
+      options.onProgress?.(80, 'parsing response');
+      
       const data = await response.json();
       const result = this.parseExtractionResult(data.response);
       
-      if (options.onProgress) {
-        options.onProgress(100);
-      }
+      options.onProgress?.(100, 'complete');
       
       return result;
     } catch (error) {
       console.error('Cloud extraction failed:', error);
-      // Return empty array on failure
       return [];
     }
   }
@@ -195,7 +223,6 @@ export class BeatExtractor {
    */
   private parseExtractionResult(response: string): ExtractedBeat[] {
     try {
-      // Find JSON in response
       const jsonMatch = response.match(/\{[\s\S]*"beats"[\s\S]*\}/);
       if (!jsonMatch) {
         console.error('No JSON found in response');
@@ -208,7 +235,6 @@ export class BeatExtractor {
         return [];
       }
       
-      // Validate and normalize each beat
       return parsed.beats.map((beat: Record<string, unknown>) => ({
         type: this.validateBeatType(beat.type),
         name: String(beat.name || 'Unnamed Beat'),
@@ -232,14 +258,14 @@ export class BeatExtractor {
       'CHARACTER', 'PLACE', 'OBJECT', 'CREATURE', 'THEME', 'MOTIF',
       'IDEA', 'QUESTION', 'INSIGHT', 'RELATIONSHIP', 'CONFLICT',
       'FEELING', 'MOOD', 'STORY', 'SCENE', 'CHAPTER',
-      'WORLD', 'DIMENSION', 'TIMELINE', 'RESOLUTION', 'CUSTOM'
+      'WORLD', 'DIMENSION', 'TIMELINE', 'RESOLUTION', 'CUSTOM', 'EVENT'
     ];
     
     if (typeof type === 'string' && validTypes.includes(type as BeatType)) {
       return type as BeatType;
     }
     
-    return 'IDEA'; // Default fallback
+    return 'IDEA';
   }
   
   /**
@@ -273,7 +299,7 @@ export class BeatExtractor {
       return type as BeatConnectionType;
     }
     
-    return 'RELATES_TO'; // Default
+    return 'RELATES_TO';
   }
   
   /**
@@ -290,6 +316,21 @@ export class BeatExtractor {
     beat1: { type: BeatType; name: string; summary?: string },
     beat2: { type: BeatType; name: string; summary?: string }
   ): Promise<{ connectionType: BeatConnectionType; strength: number; evidence: string; isContradiction: boolean } | null> {
+    // Try edge first
+    const edgeAvailable = await this.checkEdgeAvailable();
+    
+    if (edgeAvailable) {
+      try {
+        const { getEdgeExtractionService } = await import('../extraction/edge-service');
+        const service = getEdgeExtractionService('gemma-3-1b');
+        await service.load();
+        return service.analyzeConnection(beat1, beat2);
+      } catch {
+        // Fall through to cloud
+      }
+    }
+    
+    // Fallback to cloud
     const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
     const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3.5:397b-cloud';
     

@@ -5,6 +5,7 @@ export type BeatType =
   | 'STORY'
   | 'SCENE'
   | 'CHAPTER'
+  | 'EVENT'
   // Entities
   | 'CHARACTER'
   | 'PLACE'
@@ -224,6 +225,7 @@ export const BEAT_TYPE_CONFIG: Record<BeatType, {
   STORY: { label: 'Story', color: '#9B59B6', shape: 'sphere-large', description: 'Main story arc' },
   SCENE: { label: 'Scene', color: '#3498DB', shape: 'octahedron', description: 'A scene or moment' },
   CHAPTER: { label: 'Chapter', color: '#2ECC71', shape: 'cube', description: 'Chapter marker' },
+  EVENT: { label: 'Event', color: '#E67E22', shape: 'octahedron', description: 'An occurrence or happening' },
   // Entities
   CHARACTER: { label: 'Character', color: '#FF6B6B', shape: 'sphere', description: 'Person or being' },
   PLACE: { label: 'Place', color: '#1ABC9C', shape: 'cube', description: 'Location' },

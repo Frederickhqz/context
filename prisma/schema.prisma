@@ -171,6 +171,7 @@ enum BeatType {
   STORY         // Main story arc
   SCENE         // A scene/moment
   CHAPTER       // Chapter marker
+  EVENT         // An occurrence or happening
   
   // Entities
   CHARACTER     // Person/being

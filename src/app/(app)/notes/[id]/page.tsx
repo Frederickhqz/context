@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { NoteExtractionPanel } from '@/components/notes/NoteExtractionPanel';
+import { isDemoMode, getDemoNotes } from '@/lib/demo/client';
 
 interface Note {
   id: string;
@@ -43,6 +44,20 @@ export default function NoteDetailPage() {
     setError(null);
 
     try {
+      // Demo mode - load from localStorage
+      if (isDemoMode()) {
+        const notes = getDemoNotes();
+        const foundNote = notes.find(n => n.id === noteId);
+        if (!foundNote) {
+          throw new Error('Note not found');
+        }
+        setNote(foundNote as unknown as Note);
+        setTitle(foundNote.title || '');
+        setContent(foundNote.contentPlain || foundNote.content || '');
+        return;
+      }
+
+      // Production mode - load from API
       const response = await fetch(`/api/notes/${noteId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch note');

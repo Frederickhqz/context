@@ -26,5 +26,4 @@ export {
   useBeatMesh,
   useBeatStats,
   useBeatSearch,
-  useBeat,
 } from './hooks';

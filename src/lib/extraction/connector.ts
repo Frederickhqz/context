@@ -14,7 +14,7 @@ interface Beat {
   embedding?: number[];
 }
 
-interface ConnectionCandidate {
+export interface ConnectionCandidate {
   fromBeatId: string;
   toBeatId: string;
   connectionType: BeatConnectionType;

@@ -104,23 +104,61 @@ export async function POST(
         // (keeping this simple for now - beats are reusable)
       }
 
+      // === CHUNKING PHASE ===
+      // For long texts, split into chunks and extract from each
+      const { chunkText, mergeChunkResults } = await import('@/lib/extraction/chunking');
+      
+      const chunks = chunkText(text, {
+        maxChunkSize: 8000,
+        minChunkSize: 2000,
+        overlapSize: 500,
+        respectBoundaries: true,
+        detectChapters: true,
+      });
+
+      console.log(`Analyzing note ${noteId}: ${text.length} chars in ${chunks.length} chunk(s)`);
+
       // === EXTRACT PHASE ===
       const { getBeatExtractor } = await import('@/lib/beats/extractor');
       const extractor = getBeatExtractor();
 
-      const extractedBeats = await extractor.extract(text, {
-        model: body.model || 'cloud'
-      });
+      // Extract beats from all chunks
+      const allBeats: Array<{
+        type: string;
+        name: string;
+        summary?: string;
+        intensity: number;
+        valence?: number;
+        confidence: number;
+        connections?: Array<{ toBeatName: string; type: string; strength: number }>;
+      }> = [];
+
+      for (const chunk of chunks) {
+        const chunkBeats = await extractor.extract(chunk.text, {
+          model: body.model || 'cloud'
+        });
+        allBeats.push(...chunkBeats);
+      }
+
+      // Deduplicate beats across chunks by name (case-insensitive)
+      const seenBeats = new Map<string, typeof allBeats[0]>();
+      for (const beat of allBeats) {
+        const key = `${beat.type}:${beat.name.toLowerCase()}`;
+        if (!seenBeats.has(key)) {
+          seenBeats.set(key, beat);
+        }
+      }
+      const uniqueBeats = Array.from(seenBeats.values());
 
       const createdBeats: Array<{ id: string; beatType: string; name: string; summary: string | null }> = [];
 
-      for (const extractedBeat of extractedBeats) {
+      for (const extractedBeat of uniqueBeats) {
         // Check if beat already exists (global dedup by name+type)
         const existing = await prisma.beat.findFirst({
           where: {
             userId: user.id,
             name: extractedBeat.name,
-            beatType: extractedBeat.type
+            beatType: extractedBeat.type as any
           }
         });
 
@@ -148,7 +186,7 @@ export async function POST(
           const created = await prisma.beat.create({
             data: {
               userId: user.id,
-              beatType: extractedBeat.type,
+              beatType: extractedBeat.type as any, // Cast to Prisma enum type
               name: extractedBeat.name,
               summary: extractedBeat.summary,
               intensity: extractedBeat.intensity || 0.5,

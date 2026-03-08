@@ -15,7 +15,7 @@ interface Beat {
   intensity?: number;
 }
 
-interface Contradiction {
+export interface Contradiction {
   beat1Id: string;
   beat2Id: string;
   type: ContradictionType;
@@ -24,7 +24,7 @@ interface Contradiction {
   resolution?: string;
 }
 
-type ContradictionType = 
+export type ContradictionType = 
   | 'DIRECT_CONFLICT'
   | 'TEMPORAL_CONFLICT'
   | 'CHARACTER_CONFLICT'

@@ -3,7 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { NoteExtractionPanel } from '@/components/notes/NoteExtractionPanel';
+import { ContradictionPanel } from '@/components/notes/ContradictionPanel';
 import { isDemoMode, getDemoNotes } from '@/lib/demo/client';
+import { detectContradictions, Contradiction } from '@/lib/extraction/contradiction-logic';
+import { SharedExtractionResult } from '@/lib/ai/shared-spec';
 
 interface Note {
   id: string;
@@ -21,6 +24,7 @@ interface Note {
       name: string;
       summary: string | null;
       intensity: number;
+      valence?: number;
     };
     relevance: number;
   }>;
@@ -38,6 +42,7 @@ export default function NoteDetailPage() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [contradictions, setContradictions] = useState<Contradiction[]>([]);
 
   const fetchNote = useCallback(async () => {
     setLoading(true);
@@ -54,6 +59,21 @@ export default function NoteDetailPage() {
         setNote(foundNote as unknown as Note);
         setTitle(foundNote.title || '');
         setContent(foundNote.contentPlain || foundNote.content || '');
+
+        // Auto-detect contradictions for demo notes
+        if (foundNote) {
+          const mockResult: SharedExtractionResult = {
+            version: "1.0",
+            beats: (foundNote as any).noteBeats?.map((nb: any) => ({
+              type: nb.beat.beatType,
+              name: nb.beat.name,
+              summary: nb.beat.summary,
+              valence: nb.beat.valence || 0
+            })) || [],
+            connections: []
+          };
+          setContradictions(detectContradictions(mockResult));
+        }
         return;
       }
 
@@ -153,6 +173,9 @@ export default function NoteDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* Contradictions Panel */}
+      <ContradictionPanel contradictions={contradictions} />
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

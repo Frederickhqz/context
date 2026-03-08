@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/layout/Sidebar";
+import { UserMenu } from "@/components/layout/UserMenu";
 
 export default function AppLayout({
   children,
@@ -8,6 +9,7 @@ export default function AppLayout({
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
+      <UserMenu />
       <main className="md:ml-64 min-h-screen">
         <div className="container max-w-5xl mx-auto py-8 px-4 pt-20 md:pt-8">
           {children}

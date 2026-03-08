@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { requireUser, AuthError } from "@/lib/auth/server";
+import { isDemoMode, getDemoNotes, createDemoNote, DemoNote } from "@/lib/demo/client";
 
 // GET /api/notes - List notes
 export async function GET(request: NextRequest) {
+  // Demo mode - return from localStorage (passed via header)
+  const demoMode = request.headers.get('x-demo-mode') === 'true';
+  if (demoMode || isDemoMode()) {
+    const notes = getDemoNotes();
+    return NextResponse.json({ notes });
+  }
+
   try {
     const user = await requireUser(request);
 

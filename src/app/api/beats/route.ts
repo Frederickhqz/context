@@ -5,8 +5,16 @@ import { requireUser, AuthError } from '@/lib/auth/server';
 import { getBeatExtractor } from '@/lib/beats/extractor';
 import { BeatType, BeatSource } from '@/lib/beats/types';
 
+// Demo mode - returns empty data when no auth
+const DEMO_MODE = !process.env.DATABASE_URL || process.env.DEMO_MODE === 'true';
+
 // GET /api/beats - List beats with filters
 export async function GET(request: NextRequest) {
+  // Demo mode - return empty mesh
+  if (DEMO_MODE) {
+    return NextResponse.json({ beats: [], total: 0 });
+  }
+
   try {
     const user = await requireUser(request);
 

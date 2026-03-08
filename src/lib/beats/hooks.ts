@@ -58,6 +58,14 @@ export function useBeatMesh(options: UseBeatMeshOptions = {}): UseBeatMeshResult
 
       if (!response.ok) {
         const data = await response.json();
+        
+        // Handle auth errors gracefully - return empty mesh instead of error
+        if (response.status === 401) {
+          console.log('Unauthenticated - showing empty universe');
+          setMesh({ nodes: [], edges: [] });
+          return;
+        }
+        
         throw new Error(data.error || 'Failed to fetch beats');
       }
 

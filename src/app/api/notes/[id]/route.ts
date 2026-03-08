@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { requireUser, AuthError } from '@/lib/auth/server';
+import { isDemoMode, getDemoNotes } from '@/lib/demo/client';
 
 function toPlainText(markdown: string): string {
   return (markdown || '')
@@ -19,6 +20,18 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Demo mode - return from localStorage
+  const demoMode = request.headers.get('x-demo-mode') === 'true';
+  if (demoMode || isDemoMode()) {
+    const { id } = await params;
+    const notes = getDemoNotes();
+    const note = notes.find(n => n.id === id);
+    if (!note) {
+      return NextResponse.json({ error: 'Note not found' }, { status: 404 });
+    }
+    return NextResponse.json({ note });
+  }
+
   try {
     const user = await requireUser(request);
     const { id } = await params;

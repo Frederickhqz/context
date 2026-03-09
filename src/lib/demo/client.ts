@@ -1,5 +1,5 @@
-// Demo mode - uses localStorage when no database is configured
-// This allows the app to work without a database for demo purposes
+// Demo mode - uses localStorage when no database is configured OR no user logged in
+// When a user logs in with real auth, use the API instead
 
 const DEMO_USER_ID = "demo-user";
 
@@ -74,14 +74,78 @@ function getPlainText(content: string): string {
     .slice(0, 500);
 }
 
-// Check if demo mode is active
+/**
+ * Check if demo mode is active.
+ * Demo mode is ACTIVE when:
+ * - No valid auth token exists in localStorage
+ * 
+ * Demo mode is INACTIVE when:
+ * - User has logged in with real Supabase auth (sb_token exists and is valid)
+ */
 export function isDemoMode(): boolean {
-  // In browser, check if we're in demo mode
-  // Demo mode is active when there's no DATABASE_URL or when explicitly set
-  if (typeof window !== "undefined") {
-    return true; // Always use demo mode in browser for now
+  if (typeof window === "undefined") return true;
+  
+  // Check for Supabase auth token
+  const token = localStorage.getItem("sb_token");
+  const userStr = localStorage.getItem("sb_user");
+  
+  // If no token or user, use demo mode
+  if (!token || !userStr) {
+    return true;
   }
-  return false;
+  
+  try {
+    const user = JSON.parse(userStr);
+    // If we have a real user (not demo), use API mode
+    if (user && user.id && user.id !== DEMO_USER_ID) {
+      return false;
+    }
+  } catch {
+    // Invalid user data, use demo mode
+    return true;
+  }
+  
+  return true;
+}
+
+/**
+ * Check if user is logged in with real auth
+ */
+export function isLoggedIn(): boolean {
+  return !isDemoMode();
+}
+
+/**
+ * Get auth token for API requests
+ */
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("sb_token");
+}
+
+/**
+ * Get current user info
+ */
+export function getCurrentUser(): { id: string; email?: string; name?: string } | null {
+  if (typeof window === "undefined") return null;
+  
+  const userStr = localStorage.getItem("sb_user");
+  if (!userStr) return null;
+  
+  try {
+    return JSON.parse(userStr);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Logout - clear auth tokens
+ */
+export function logout(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("sb_token");
+  localStorage.removeItem("sb_user");
 }
 
 // Notes

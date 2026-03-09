@@ -8,6 +8,7 @@ import {
   deleteDemoNote,
   searchDemoNotes,
   isDemoMode,
+  getAuthToken,
 } from "@/lib/demo/client";
 import type { DemoNote } from "@/lib/demo/client";
 
@@ -23,7 +24,12 @@ export function useDemoNotes() {
         const demoNotes = getDemoNotes();
         setNotes(demoNotes);
       } else {
-        const response = await fetch("/api/notes");
+        const token = getAuthToken();
+        const response = await fetch("/api/notes", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
         const data = await response.json();
         setNotes(data.notes || []);
       }
@@ -47,9 +53,13 @@ export function useDemoNotes() {
         setNotes(prev => [note, ...prev]);
         return note;
       } else {
+        const token = getAuthToken();
         const response = await fetch("/api/notes", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
           body: JSON.stringify(data),
         });
         const result = await response.json();
@@ -74,9 +84,13 @@ export function useDemoNotes() {
         }
         return note;
       } else {
+        const token = getAuthToken();
         const response = await fetch("/api/notes", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
           body: JSON.stringify({ id, ...data }),
         });
         const result = await response.json();
@@ -99,7 +113,13 @@ export function useDemoNotes() {
         setNotes(prev => prev.filter(n => n.id !== id));
         return true;
       } else {
-        const response = await fetch(`/api/notes?id=${id}`, { method: "DELETE" });
+        const token = getAuthToken();
+        const response = await fetch(`/api/notes?id=${id}`, { 
+          method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
         const result = await response.json();
         if (result.success) {
           setNotes(prev => prev.filter(n => n.id !== id));
@@ -122,7 +142,12 @@ export function useDemoNotes() {
       if (isDemoMode()) {
         return searchDemoNotes(query);
       } else {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const token = getAuthToken();
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
         const data = await response.json();
         return data.results || [];
       }

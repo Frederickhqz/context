@@ -340,7 +340,20 @@ export function BeatUniverse({
           />
         ))}
 
-        <OrbitControls makeDefault minDistance={10} maxDistance={200} />
+        <OrbitControls 
+          makeDefault 
+          minDistance={10} 
+          maxDistance={200}
+          // Mobile-optimized touch controls
+          touches={{ ONE: 1, TWO: 2 }} // 1-finger rotate, 2-finger zoom
+          enableDamping
+          dampingFactor={0.05}
+          rotateSpeed={0.5} // Slower on touch devices
+          zoomSpeed={0.8}
+          panSpeed={0.5}
+          maxPolarAngle={Math.PI * 0.85}
+          minPolarAngle={Math.PI * 0.15}
+        />
       </Canvas>
 
       <div className="absolute bottom-6 left-6 p-4 rounded-xl bg-black/60 border border-white/10 backdrop-blur-md text-[11px] text-white/80 space-y-2 pointer-events-none">
